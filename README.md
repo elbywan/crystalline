@@ -14,7 +14,7 @@
 
 <div align="center">
 <h3>Work in progress!</h3>
-<img src="assets/demo-small.gif" />
+<img src="assets/small_demo.gif" />
 </div>
 
 ## Installation
@@ -139,7 +139,7 @@ By clicking on a symbol with the Cmd or Ctrl key pressed (editor/platform depend
 
 Hovering should display either a variable type, a function definition signature or the expanded macro.
 
-## Caveats
+## Limitations
 
 - Due to Crystal having a wide type inference system (which is incredibly convenient and practical), compilation times can unfortunately be relatively long for big projects and depending on the hardware. This means that the LSP will be stuck waiting for the compiler to finish before being able to provide a response.
 Crystalline tries to mitigate that by caching compilation outcome when possible.
