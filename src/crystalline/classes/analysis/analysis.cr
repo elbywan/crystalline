@@ -75,53 +75,55 @@ module Crystalline::Analysis
     nodes = CursorVisitor.new(location).process(result)
     nodes.last?.try { |node|
       LSP::Log.debug { "Class of node at cursor: #{node.class} " }
-      locations = if node.is_a? Crystal::Call
-                    if defs = node.target_defs
-                      defs.compact_map { |d|
-                        start_location = d.location.try { |loc| loc.expanded_location || loc }.not_nil!
-                        end_location = d.end_location.try { |loc| loc.expanded_location || loc }.not_nil!
-                        {start_location, end_location}
-                      }
-                    elsif expanded_macro = node.expanded_macro
-                      start_location = expanded_macro.location.try { |loc| loc.expanded_location || loc }.not_nil!
-                      end_location = expanded_macro.end_location.try { |loc| loc.expanded_location || loc } || start_location
-                      [{start_location, end_location}]
-                    end
-                  elsif node.is_a? Crystal::Require
-                    location = node.location
-                    filename = node.string
-                    relative_to = location.try &.original_filename
-                    filenames = result.program.find_in_path(filename, relative_to)
-                    filenames.try &.map { |path|
-                      location = Crystal::Location.new(
-                        path,
-                        line_number: 1,
-                        column_number: 1
-                      )
-                      {location, location}
-                    }
-                  elsif node.is_a? Crystal::Path
-                    target = node.target_const || node.target_type
-                    target ||= nodes[-2]?.try &.type?.try &.lookup_path(node)
-                    # LSP::Log.info { "Path target: #{target} "} if target
-                    # LSP::Log.info { "Path type: #{node.type?} "}
-                    # LSP::Log.info { "Path lookup: #{nodes[-2]?.try &.type?.try &.lookup_path(node)}"} unless target
-                    target.as?(Crystal::Const | Crystal::Type).try &.locations.try &.map do |location|
-                      end_location = Crystal::Location.new(
-                        location.filename,
-                        line_number: location.line_number + 1,
-                        column_number: 0
-                      )
-                      {location, end_location}
-                    end
-                    # elsif (typ = node.type).responds_to?(:location) && (type_loc = typ.location)
-                    #   type_end_loc = typ.end_location || Crystal::Location.new(
-                    #     type_loc.filename,
-                    #     line_number: type_loc.line_number + 1,
-                    #     column_number: 0
-                    #   )
-                    #   [{ type_loc, type_end_loc }]
-                  end
+      locations = begin
+        if node.is_a? Crystal::Call
+          if defs = node.target_defs
+            defs.compact_map { |d|
+              start_location = d.location.try { |loc| loc.expanded_location || loc }.not_nil!
+              end_location = d.end_location.try { |loc| loc.expanded_location || loc }.not_nil!
+              {start_location, end_location}
+            }
+          elsif expanded_macro = node.expanded_macro
+            start_location = expanded_macro.location.try { |loc| loc.expanded_location || loc }.not_nil!
+            end_location = expanded_macro.end_location.try { |loc| loc.expanded_location || loc } || start_location
+            [{start_location, end_location}]
+          end
+        elsif node.is_a? Crystal::Require
+          location = node.location
+          filename = node.string
+          relative_to = location.try &.original_filename
+          filenames = result.program.find_in_path(filename, relative_to)
+          filenames.try &.map { |path|
+            location = Crystal::Location.new(
+              path,
+              line_number: 1,
+              column_number: 1
+            )
+            {location, location}
+          }
+        elsif node.is_a? Crystal::Path
+          target = node.target_const || node.target_type
+          target ||= nodes[-2]?.try &.type?.try &.lookup_path(node)
+          # LSP::Log.info { "Path target: #{target} "} if target
+          # LSP::Log.info { "Path type: #{node.type?} "}
+          # LSP::Log.info { "Path lookup: #{nodes[-2]?.try &.type?.try &.lookup_path(node)}"} unless target
+          target.as?(Crystal::Const | Crystal::Type).try &.locations.try &.map do |location|
+            end_location = Crystal::Location.new(
+              location.filename,
+              line_number: location.line_number + 1,
+              column_number: 0
+            )
+            {location, end_location}
+          end
+          # elsif (typ = node.type).responds_to?(:location) && (type_loc = typ.location)
+          #   type_end_loc = typ.end_location || Crystal::Location.new(
+          #     type_loc.filename,
+          #     line_number: type_loc.line_number + 1,
+          #     column_number: 0
+          #   )
+          #   [{ type_loc, type_end_loc }]
+        end
+      end
 
       Definitions.new(node: node, locations: locations)
     }

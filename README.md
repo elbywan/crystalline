@@ -35,6 +35,7 @@ development_dependencies:
 Then:
 
 ```sh
+# Produces a binary at ./bin/crystalline
 shards build crystalline --release --no-debug --progress -Dpreview_mt
 ```
 
