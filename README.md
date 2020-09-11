@@ -194,7 +194,7 @@ Debug logs are deactivated by default, uncomment this line in `src/server.cr` to
 
 ## Trivia
 
-#### Why the name `cristalline`?
+#### Why the name `crystalline`?
 
 Aside of the obvious reasons (crystal-lang), `cristaline` is a famous bottled water brand in France.
 
