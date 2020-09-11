@@ -1,0 +1,20 @@
+name: crystalline
+version: 0.1.0
+
+authors:
+  - Julien Elbaz <elbywan@hotmail.com>
+
+targets:
+  crystalline:
+    main: src/crystalline.cr
+  sentry:
+    main: lib/sentry/src/sentry_cli.cr
+
+development_dependencies:
+  sentry:
+    github: samueleaton/sentry
+    branch: master
+
+crystal: 0.35.1
+
+license: MIT

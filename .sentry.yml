@@ -1,0 +1,29 @@
+# This file is used to override the default Sentry configuration without
+# having to specify the options on the command line.
+#
+# All configuration options in this file are optional, and will fall back
+# to the default values that Sentry determines based on your `shard.yml`.
+#
+# Options passed through the command line will override these settings.
+
+# Set this to `true` to show configuration information when starting Sentry.
+info: true
+
+# The command used to compile the application. Setting this option to `nil` or
+# an empty string will act like specifying `--no-build` on the command line.
+build: crystal build ./src/crystalline.cr -o ./bin/crystalline -Dpreview_mt
+
+# Any additional arguments to pass to the build command. Build args may only
+# be given if the build command is a single argument.
+build_args:
+
+# The command used to run the compiled application.
+run: /bin/echo
+
+# Any additional arguments to pass to the run command. Run args may only be
+# given if the run command is a single argument.
+run_args:
+
+# The list of patterns of files for sentry to watch.
+watch:
+  - ./src/**/*.cr

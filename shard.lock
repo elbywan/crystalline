@@ -1,0 +1,6 @@
+version: 2.0
+shards:
+  sentry:
+    git: https://github.com/samueleaton/sentry.git
+    version: 0.3.2+git.commit.edcafd89be2658a4bd306ca1096ef9918c727edf
+

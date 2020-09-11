@@ -1,0 +1,3 @@
+require "./crystalline/*"
+
+Crystalline.init
