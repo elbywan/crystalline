@@ -4,3 +4,4 @@
 /.shards/
 *.dwarf
 /test*.cr
+.vscode
