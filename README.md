@@ -12,9 +12,10 @@
 
 #### It aims to provide some language features (like go-to, autocompletion, syntax and semantic checking) and ease development with any compatible code editor.
 
-### *Work in progress!*
-
-![small demo](assets/demo-small.gif)
+<div align="center">
+<h3>Work in progress!</h3>
+<img src="assets/demo-small.gif" />
+</div>
 
 ## Installation
 
