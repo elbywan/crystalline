@@ -167,7 +167,7 @@ Logging is the most practical way to debug the LSP.
 # Use the LSP logger to display logs in the editor.
 LSP::Log.info { "log" }
 ```
-Debug logs are deactivated by default, uncomment this line in `src/server.cr` to enable them:
+Debug logs are deactivated by default, uncomment this line in `src/crystalline/lsp/server.cr` to enable them:
 
 ```crystal
 # Uncomment:
