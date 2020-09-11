@@ -118,23 +118,23 @@ require "./spec/**"
 
 ## Features
 
-### Code Diagnostics
+#### Code Diagnostics
 
 Syntax and semantic checks on save.
 
-### Autocompletion
+#### Autocompletion
 
 Triggered when typing the `.` or `:` characters and list (depending on the target) method definitions, macros or module/class/struct names.
 
-### Formatting
+#### Formatting
 
 A whole document or a text selection.
 
-### Goto definition
+#### Goto definition
 
 By clicking on a symbol with the Cmd or Ctrl key pressed (editor/platform dependent).
 
-### Hover information
+#### Hover information
 
 Hovering should display either a variable type, a function definition signature or the expanded macro.
 
