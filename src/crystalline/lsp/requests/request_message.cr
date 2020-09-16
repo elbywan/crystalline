@@ -38,6 +38,7 @@ module LSP
       "textDocument/rangeFormatting":   DocumentRangeFormattingRequest,
       "textDocument/hover":             HoverRequest,
       "textDocument/definition":        DefinitionRequest,
+      "textDocument/signatureHelp":     SignatureHelpRequest
     }, default: UnknownRequest
   end
 

@@ -13,8 +13,11 @@ module Crystalline
     completion_provider:                LSP::CompletionOptions.new({
       trigger_characters: [".", ":"],
     }),
-    hover_provider:      true,
-    definition_provider: true,
+    hover_provider:          true,
+    definition_provider:     true,
+    # signature_help_provider: LSP::SignatureHelpOptions.new({
+    #   trigger_characters: ["(", " "]
+    # }),
   })
 
   module EnvironmentConfig
