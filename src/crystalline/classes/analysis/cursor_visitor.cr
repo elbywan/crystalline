@@ -9,6 +9,7 @@ module Crystalline
 
     def initialize(@target_location : Crystal::Location)
       @nodes = [] of Crystal::ASTNode
+      @visited_types = Set(Crystal::Type).new
     end
 
     def process(result : Crystal::Compiler::Result)
@@ -20,6 +21,12 @@ module Crystalline
       end
 
       @nodes
+    end
+
+    private def process_type(type : Crystal::Type) : Nil
+      return if @visited_types.includes?(type)
+      @visited_types << type
+      super
     end
 
     private def nearest_end_location(node)
@@ -51,8 +58,6 @@ module Crystalline
       elsif @top_level && @nodes.empty?
         if node.is_a? Crystal::Require
           node.expanded.try &.accept(self)
-          # elsif node.is_a? Crystal::Def || node.is_a? Crystal::Macro
-          #   node.args.each &.accept(self)
         else
           true
         end

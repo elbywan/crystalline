@@ -26,7 +26,7 @@ class LSP::Server
     @thread = Thread.current
     LSP::Log.backend = LogBackend.new(self)
     # ::Log.setup(:debug, LSP::Log.backend.not_nil!)
-    # Log.backend = ::Log::IOBackend.new(File.new "./crystalline_logs.txt", mode: "w+")
+    # Log.backend = ::Log::IOBackend.new(File.new "./crystalline_logs.txt", mode: "a+")
   end
 
   def send(message : LSP::Message, *, do_not_log = false)

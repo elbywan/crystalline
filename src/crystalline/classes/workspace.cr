@@ -211,13 +211,30 @@ class Crystalline::Workspace
       column_number: position.character + 1
     )
     result.try { |r|
-      Analysis.node_at_cursor(r, location)
-    }.try do |n|
+      Analysis.nodes_at_cursor(r, location)
+    }.try do |nodes|
+      n = nodes.last?
       contents = [] of String
+
+      # LSP::Log.info { "Node at cursor: #{n}" }
+      # LSP::Log.info { "Node class: #{n.class}" }
+      # LSP::Log.info { "Node type: #{n.try &.type?}" }
+      # LSP::Log.info { "Node type class: #{n.try &.type?.try &.class}" }
+      # LSP::Log.info { "Nodes classes: #{nodes.map &.class}"}
 
       if n.is_a? Crystal::Def || n.is_a? Crystal::Macro
         contents << code_markdown(format_def(n), language: "crystal")
         append_markdown_doc contents, n.doc
+      elsif n.responds_to? :resolved_type
+        str = ""
+        if n.responds_to? :name
+          str += "#{n.name}: #{n.resolved_type}"
+        else
+          str += n.resolved_type.to_s
+          str = n.to_s if str.empty?
+        end
+        contents << code_markdown(str, language: "crystal")
+        append_markdown_doc contents, n.resolved_type.doc
       elsif n.is_a? Crystal::Call
         if definition = n.target_defs.try &.first?
           contents << code_markdown(format_def(definition), language: "crystal")
@@ -225,15 +242,20 @@ class Crystalline::Workspace
           contents << code_markdown(n.expanded.to_s, language: "crystal")
         end
         append_markdown_doc contents, (definition || n.expanded_macro).try &.doc
-        # elsif n.is_a? Crystal::Path
-        # Todo
-      else
+      elsif n.is_a? Crystal::Path
+        node_type = n.type? || Analysis.resolve_path(n, nodes)
+        if node_type
+          contents << code_markdown(node_type.to_s, language: "crystal")
+          append_markdown_doc contents, node_type.doc
+        end
+      elsif n
         str = ""
         if n.responds_to? :name
-          str += "#{n.name}: "
+          str += "#{n.name}: #{n.type? || "?"}"
+        else
+          str += n.type?.to_s
+          str = n.to_s if str.empty?
         end
-        str += n.type?.to_s
-        str = n.to_s if str.empty?
         contents << code_markdown(str, language: "crystal")
         append_markdown_doc contents, n.doc
       end
@@ -410,7 +432,7 @@ class Crystalline::Workspace
       case trigger_character
       when "."
         if n.type?.responds_to? :defs
-          Analysis.all_defs(n.type).each { |def_name, definition, owner_type, _nesting|
+          Analysis.all_defs(n.type).each { |def_name, definition, owner_type, nesting|
             owner_prefix = "*Inherited from: #{owner_type.name}*\n\n" if owner_type.responds_to? :name && owner_type != n.type
             owner_prefix ||= ""
             documentation = (owner_prefix + (definition.doc || ""))
@@ -425,7 +447,7 @@ class Crystalline::Workspace
               kind:   LSP::CompletionItemKind::Function,
               detail: format_def(definition),
               # text_edit: text_edit,
-              # sort_text: (nesting + 1).chr.to_s,
+              sort_text: (nesting + 1).chr.to_s + def_name,
               documentation: documentation.try { |doc|
                 LSP::MarkupContent.new({
                   kind:  LSP::MarkupKind::MarkDown,
@@ -435,7 +457,7 @@ class Crystalline::Workspace
             })
           }
 
-          Analysis.all_macros(n.type).each { |macro_name, macro_def, owner_type, _nesting|
+          Analysis.all_macros(n.type).each { |macro_name, macro_def, owner_type, nesting|
             owner_prefix = "*Inherited from: #{owner_type.name}*\n\n" if owner_type.responds_to? :name && owner_type != n.type
             owner_prefix ||= ""
             documentation = (owner_prefix + (macro_def.doc || ""))
@@ -445,7 +467,7 @@ class Crystalline::Workspace
               kind:   LSP::CompletionItemKind::Method,
               detail: format_def(macro_def),
               # text_edit: text_edit,
-              # sort_text: (nesting + 1).chr.to_s,
+              sort_text: (nesting + 1).chr.to_s + macro_name,
               documentation: documentation.try { |doc|
                 LSP::MarkupContent.new({
                   kind:  LSP::MarkupKind::MarkDown,
@@ -459,8 +481,7 @@ class Crystalline::Workspace
         node_type = n.type?
 
         if n.is_a? Crystal::Path
-          node_type ||= n.target_const || n.target_type
-          node_type ||= nodes[-2]?.try &.type?.try &.lookup_path(n)
+          node_type = Analysis.resolve_path(n, nodes)
         end
 
         if node_type.is_a? Crystal::MetaclassType
