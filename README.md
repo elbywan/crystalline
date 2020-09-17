@@ -146,6 +146,8 @@ Crystalline tries to mitigate that by caching compilation outcome when possible.
 
 - Methods that are not called anywhere will not be analyzed, as this is how the Crystal compiler works.
 
+- The parser is not permissive, nor incremental which means that the features will sometimes not work. It would involve a massive amount of work to change that.
+
 ## Development
 
 ###  Dev build
