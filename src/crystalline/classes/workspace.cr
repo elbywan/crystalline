@@ -10,7 +10,6 @@ class Crystalline::Workspace
   getter root_uri : URI?
   getter opened_documents = {} of String => TextDocument
   getter dependencies : Set(String) = Set(String).new
-  getter? last_result : Crystal::Compiler::Result?
   getter? entry_point : URI do
     root_uri.try { |uri|
       path = Path[uri.decoded_path, "shard.yml"]
@@ -86,8 +85,21 @@ class Crystalline::Workspace
   @compilation_queue = Set(String).new
   @compilation_queue_lock = Mutex.new
 
-  def compile(server : LSP::Server, file_uri : URI? = nil, *, in_memory = false, synchronous = false, ignore_diagnostics = false, wants_doc = false, text_overrides = nil, permissive = false)
+  def recalculate_dependencies(server)
+    return unless target = entry_point?
+
+    Analysis.compile(server, target, ignore_diagnostics: true, wants_doc: false, top_level: true).try { |result|
+      ConcreteSemanticVisitor.new(result.program).visit(result.node)
+      @dependencies = result.program.requires
+    }
+  rescue
+    nil
+  end
+
+  def compile(server : LSP::Server, file_uri : URI? = nil, *, in_memory = false, synchronous = false, ignore_diagnostics = false, wants_doc = false, text_overrides = nil, permissive = false, top_level = false)
     return nil unless file_uri || entry_point?
+
+    recalculate_dependencies(server) if dependencies.size < 2
 
     if external_file = file_uri.try { |uri| !inside_workspace?(uri) }
       target = file_uri.not_nil!
@@ -140,7 +152,7 @@ class Crystalline::Workspace
           @compilation_queue.delete target.decoded_path
         }
       else
-        result = Analysis.compile(server, sources.try { |s| s } || target, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, permissive: permissive) {
+        result = Analysis.compile(server, sources.try { |s| s } || target, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, permissive: permissive, top_level: top_level) {
           @compilation_queue_lock.synchronize {
             @compilation_queue.delete target.decoded_path
           }

@@ -2,30 +2,31 @@ require "compiler/crystal/**"
 require "../diagnostics"
 require "./cursor_visitor"
 require "./submodule_visitor"
+require "./concrete_semantic_visitor"
 
 module Crystalline::Analysis
   @@compilation_lock = Mutex.new
 
-  def self.compile(server : LSP::Server, file_uri : URI, *, file_overrides : Hash(String, String)? = nil, ignore_diagnostics = false, wants_doc = false, permissive = false)
-    self.compile(server, file_uri, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, permissive: permissive) { }
+  def self.compile(server : LSP::Server, file_uri : URI, *, file_overrides : Hash(String, String)? = nil, ignore_diagnostics = false, wants_doc = false, permissive = false, top_level = false)
+    self.compile(server, file_uri, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, permissive: permissive, top_level: top_level) { }
   end
 
-  def self.compile(server : LSP::Server, file_uri : URI, *, file_overrides : Hash(String, String)? = nil, ignore_diagnostics = false, wants_doc = false, permissive = false, &lock_start)
+  def self.compile(server : LSP::Server, file_uri : URI, *, file_overrides : Hash(String, String)? = nil, ignore_diagnostics = false, wants_doc = false, permissive = false, top_level = false, &lock_start)
     if file_uri.scheme == "file"
       file = File.new file_uri.decoded_path
       sources = [
         Crystal::Compiler::Source.new(file_uri.decoded_path, file.gets_to_end),
       ]
       file.close
-      self.compile(server, sources, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, permissive: permissive, &lock_start)
+      self.compile(server, sources, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, permissive: permissive, top_level: top_level, &lock_start)
     end
   end
 
-  def self.compile(server : LSP::Server, sources : Array(Crystal::Compiler::Source), *, file_overrides : Hash(String, String)? = nil, ignore_diagnostics = false, wants_doc = false, permissive = false)
-    self.compile(server, sources, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, permissive: permissive) { }
+  def self.compile(server : LSP::Server, sources : Array(Crystal::Compiler::Source), *, file_overrides : Hash(String, String)? = nil, ignore_diagnostics = false, wants_doc = false, permissive = false, top_level = false)
+    self.compile(server, sources, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, permissive: permissive, top_level: top_level) { }
   end
 
-  def self.compile(server : LSP::Server, sources : Array(Crystal::Compiler::Source), *, file_overrides : Hash(String, String)? = nil, ignore_diagnostics = false, wants_doc = false, permissive = false, &lock_start)
+  def self.compile(server : LSP::Server, sources : Array(Crystal::Compiler::Source), *, file_overrides : Hash(String, String)? = nil, ignore_diagnostics = false, wants_doc = false, permissive = false, top_level = false, &lock_start)
     diagnostics = Diagnostics.new
     compiler = Crystal::Compiler.new
     compiler.no_codegen = true
@@ -33,10 +34,11 @@ module Crystalline::Analysis
     compiler.no_cleanup = true
     compiler.file_overrides = file_overrides
     compiler.wants_doc = wants_doc
-    # _ = Crystal::Compiler.new.top_level_semantic(sources)
     result = @@compilation_lock.synchronize {
       lock_start.call
-      if permissive
+      if top_level
+        compiler.top_level_semantic(sources)
+      elsif permissive
         compiler.permissive_compile(sources, "")
       else
         compiler.compile(sources, "")
@@ -58,6 +60,7 @@ module Crystalline::Analysis
     result
   ensure
     diagnostics.try &.publish(server) unless ignore_diagnostics
+    GC.collect
   end
 
   def self.node_at_cursor(result : Crystal::Compiler::Result, location : Crystal::Location) : Crystal::ASTNode?
