@@ -53,8 +53,8 @@ class LSP::Server
     send(message: response_message, do_not_log: do_not_log)
   end
 
-  def reply(request : LSP::RequestMessage, *, e : Exception, do_not_log = false)
-    response_message = LSP::ResponseMessage(Nil).new({id: request.id, error: LSP::ResponseError.new(e)})
+  def reply(request : LSP::RequestMessage, *, exception, do_not_log = false)
+    response_message = LSP::ResponseMessage(Nil).new({id: request.id, error: LSP::ResponseError.new(exception)})
     send(message: response_message, do_not_log: do_not_log)
   end
 
@@ -114,7 +114,7 @@ class LSP::Server
         reply(initialize_message, result: init_result || LSP::InitializeResult.new({capabilities: @server_capabilities}))
         break
       elsif initialize_message.is_a? LSP::RequestMessage
-        reply(initialize_message, e: LSP::Exception.new(
+        reply(initialize_message, exception: LSP::Exception.new(
           code: :server_not_initialized,
           message: "Expecting an initialize request but received #{initialize_message.method}.",
         ))
@@ -126,10 +126,10 @@ class LSP::Server
     end
   end
 
-  private def on_exception(message, e : Exception)
+  private def on_exception(message, e)
     Log.error(exception: e) { e }
     if message.is_a? LSP::RequestMessage
-      reply(request: message, e: e.as(Exception))
+      reply(request: message, exception: e)
     end
   end
 
@@ -149,7 +149,7 @@ class LSP::Server
           Async.spawn_on_different_thread(thread) do
             result = controller.on_request(request_message)
             reply(request: request_message, result: result)
-          rescue e : Exception
+          rescue e
             on_exception(message, e)
           end
         else
@@ -165,14 +165,14 @@ class LSP::Server
           original_message = requests_sent.delete(response_message.id)
           Async.spawn_on_different_thread(thread) do
             controller.on_response(response_message, original_message.try &.as(RequestMessage))
-          rescue e : Exception
+          rescue e
             on_exception(message, e)
           end
         end
       end
     rescue IO::Error
       break
-    rescue e : Exception
+    rescue e
       on_exception(message, e)
     end
   end
