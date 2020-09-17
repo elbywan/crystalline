@@ -329,21 +329,28 @@ class Crystalline::Workspace
     # LSP::Log.info { "completion: #{trigger_character}"}
 
     document_lines = text_document.contents.lines(chomp: false)
-    if trigger_character
-      prefix = document_lines[position.line][0...position.character].rstrip(trigger_character)
-      suffix = document_lines[position.line][(position.character)..]?
-      left_offset = position.character - prefix.size
-      right_offset = 0
-    else
+    # if trigger_character
+    #   prefix = document_lines[position.line][0...position.character].rstrip(trigger_character)
+    #   suffix = document_lines[position.line][(position.character)..]?
+    #   left_offset = position.character - prefix.size
+    #   right_offset = 0
+    # else
       left_offset = 0
       right_offset = 0
-      document_lines[position.line][0...position.character].each_char_with_index { |char, index|
-        case char
-        when '.', ':', ' ', '(', ')', '[', ']', '{', '}', ';'
-          trigger_character = char.to_s
-          left_offset = position.character - index
-        end
-      }
+
+      if trigger_character
+        prefix = document_lines[position.line][0...position.character].rstrip(trigger_character)
+        left_offset = position.character - prefix.size
+      else
+        document_lines[position.line][0...position.character].each_char_with_index { |char, index|
+          case char
+          when '.', ':', ' ', '(', ')', '[', ']', '{', '}', ';'
+            trigger_character = char.to_s
+            left_offset = position.character - index
+          end
+        }
+        prefix = document_lines[position.line][0...(position.character - left_offset)]
+      end
 
       # if trigger_character
       #   prefix = document_lines[position.line][0...position.character].rstrip(trigger_character)
@@ -352,11 +359,11 @@ class Crystalline::Workspace
       # end
       # suffix = document_lines[position.line][(position.character)..]?
 
-      prefix = document_lines[position.line][0...(position.character - left_offset)]
+      # prefix = document_lines[position.line][0...(position.character - left_offset)]
       suffix = document_lines[position.line][(position.character)..]?
 
       suffix.try &.each_char_with_index { |char, index|
-        unless char.ascii_alphanumeric? || char == '_' || char == '?' || char == '!'
+        unless char.ascii_alphanumeric? || char == '_' || char == '?' || char == '!' || char == ':'
           right_offset = index
           break
         end
@@ -370,10 +377,11 @@ class Crystalline::Workspace
       # end
       }
       suffix = suffix.try &.[right_offset...]?
-    end
+    # end
 
     # LSP::Log.info { "prefix(left offset #{left_offset}): #{prefix}"}
     # LSP::Log.info { "suffix(right offset #{right_offset}): #{suffix}"}
+    # LSP::Log.info { "trigger character: #{trigger_character}"}
 
     document_lines[position.line] = prefix + (suffix || "")
     text_overrides = {
@@ -386,7 +394,7 @@ class Crystalline::Workspace
       column_number: position.character - left_offset
     )
 
-    # Temporary?
+    # Temporary until on the fly context completion can be handled
     return unless trigger_character == "." || trigger_character == ":"
 
     result = self.compile(server, file_uri, in_memory: true, synchronous: true, ignore_diagnostics: false, wants_doc: true, text_overrides: text_overrides, permissive: true)
@@ -481,7 +489,7 @@ class Crystalline::Workspace
         node_type = n.type?
 
         if n.is_a? Crystal::Path
-          node_type = Analysis.resolve_path(n, nodes)
+          node_type ||= Analysis.resolve_path(n, nodes)
         end
 
         if node_type.is_a? Crystal::MetaclassType

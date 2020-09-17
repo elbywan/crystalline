@@ -6,6 +6,7 @@ module Crystalline
 
     def initialize(@target : Crystal::Type)
       @submodules = [] of Crystal::ModuleType
+      @visited_types = Set(Crystal::Type).new
     end
 
     def process_result(result : Crystal::Compiler::Result)
@@ -14,6 +15,12 @@ module Crystalline
         process(file_module)
       }
       @submodules
+    end
+
+    private def process_type(type : Crystal::Type) : Nil
+      return if @visited_types.includes?(type)
+      @visited_types << type
+      super
     end
 
     private def process(type : Crystal::Type) : Nil
