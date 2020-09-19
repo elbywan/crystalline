@@ -59,8 +59,9 @@ module Crystalline::Analysis
     end
     result
   ensure
-    diagnostics.try &.publish(server) unless ignore_diagnostics
+    compiler.try { |c| GC.free(Pointer(Crystal::Compiler).new(c.object_id).as(Void*)) }
     GC.collect
+    diagnostics.try &.publish(server) unless ignore_diagnostics
   end
 
   def self.node_at_cursor(result : Crystal::Compiler::Result, location : Crystal::Location) : Crystal::ASTNode?
