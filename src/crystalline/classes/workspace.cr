@@ -552,6 +552,23 @@ class Crystalline::Workspace
         # }
       end
 
+      selected_element_index = nil
+      completion_items.each_with_index do |elt, i|
+        sort_text = elt.sort_text || elt.label
+        selected_element_index ||= i
+        target = completion_items[selected_element_index].try { |elt| elt.sort_text || elt.label }
+        if (sort_text <=> target) < 0
+          selected_element_index = i
+        end
+      end
+
+      if selected_element_index
+        selected_element = completion_items[selected_element_index]
+        selected_element.preselect = true
+        completion_items[selected_element_index] = selected_element
+      end
+
+
       LSP::CompletionList.new({
         is_incomplete: false,
         items:         completion_items,
