@@ -8,13 +8,12 @@
 
 <hr/>
 
-#### `Crystalline` is an implementation of the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) written in and for the [Crystal Language](https://crystal-lang.org/).
+**`Crystalline` is an implementation of the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) written in and for the [Crystal Language](https://crystal-lang.org/). It aims to provide limited language features (like go-to, autocompletion, syntax and semantic checking) and ease development with any compatible code editor.**
 
-#### It aims to provide some language features (like go-to, autocompletion, syntax and semantic checking) and ease development with any compatible code editor.
+<hr/>
 
 <div align="center">
-<h3>Work in progress!</h3>
-<img src="assets/small_demo.gif" />
+<img src="assets/small_demo.gif" height="300" />
 </div>
 
 ## Installation
@@ -119,11 +118,13 @@ require "./spec/**"
 
 ## Features
 
+**Disclaimer: `Crystalline` is not as extensive in terms of features as other Language Servers but still provides very convenient tools.**
+
 #### Code Diagnostics
 
 Syntax and semantic checks on save.
 
-#### Autocompletion
+#### Limited Autocompletion
 
 Triggered when typing the `.` or `:` characters and list (depending on the target) method definitions, macros or module/class/struct names.
 
@@ -137,7 +138,7 @@ By clicking on a symbol with the Cmd or Ctrl key pressed (editor/platform depend
 
 #### Hover information
 
-Hovering should display either a variable type, a function definition signature or the expanded macro.
+Hovering should display (when possible) either a variable type, a function definition signature or the expanded macro.
 
 ## Limitations
 
