@@ -165,7 +165,10 @@ module Crystalline::Analysis
     end
 
     type.parents.try &.each do |parent|
-      self.all_defs(parent, accumulator: accumulator, nesting: nesting + 1)
+      if type.responds_to? :instance_type
+        extends_self = type.instance_type == parent
+      end
+      self.all_defs(parent, accumulator: accumulator, nesting: extends_self ? nesting : nesting + 1)
     end
 
     accumulator
