@@ -78,7 +78,7 @@ env LLVM_CONFIG=/usr/local/opt/llvm/bin/llvm-config crystal build ./src/crystall
 
 `Crystalline` is meant to be used alongside an editor extension.
 
-For instance if you are a VSCode user, add the [Crystal Language extension](https://marketplace.visualstudio.com/items?itemName=faustinoaq.crystal-lang).
+For instance if you are a VSCode user, add the [Crystal Language extension](https://marketplace.visualstudio.com/items?itemName=crystal-lang-tools.crystal-lang).
 Then in the configuration, type the **absolute** location of the Crystalline binary in the following field:
 
 ![vscode screen](assets/vscode_extension_screen.png)
