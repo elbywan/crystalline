@@ -32,7 +32,7 @@ module LSP
 
   module Async
     def self.spawn_on_different_thread(thread : Thread, &block : ->) : Nil
-      block
+      block # prevents a compiler error
       {% if flag?(:preview_mt) %}
         spawn same_thread: false do
           if Thread.current == thread

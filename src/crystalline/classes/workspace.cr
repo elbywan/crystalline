@@ -425,6 +425,7 @@ class Crystalline::Workspace
 
             completion_items << LSP::CompletionItem.new({
               label:       format_def(definition, short: true),
+              insert_text:  def_name,
               kind:        LSP::CompletionItemKind::Function,
               filter_text: def_name,
               detail:      format_def(definition),
@@ -451,6 +452,7 @@ class Crystalline::Workspace
 
             completion_items << LSP::CompletionItem.new({
               label:       format_def(macro_def, short: true),
+              insert_text: macro_name,
               kind:        LSP::CompletionItemKind::Method,
               filter_text: macro_name,
               detail:      format_def(macro_def),
