@@ -132,3 +132,12 @@ class Crystal::Program
     end
   end
 end
+
+struct Crystal::TypeDeclarationProcessor
+  private def declare_meta_type_var(vars, owner, name, info : TypeGuessVisitor::TypeInfo, freeze_type = true)
+    type = info.type
+    type = Type.merge!(type, @program.nil) unless info.outside_def
+    # add `location: info.location` argument to preserve TypeInfo location
+    declare_meta_type_var(vars, owner, name, type, freeze_type: freeze_type, location: info.location)
+  end
+end

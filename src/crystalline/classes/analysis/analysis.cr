@@ -65,18 +65,18 @@ module Crystalline::Analysis
   end
 
   def self.node_at_cursor(result : Crystal::Compiler::Result, location : Crystal::Location) : Crystal::ASTNode?
-    nodes = CursorVisitor.new(location).process(result)
+    nodes, _ = CursorVisitor.new(location).process(result)
     nodes.last?
   end
 
-  def self.nodes_at_cursor(result : Crystal::Compiler::Result, location : Crystal::Location) : Array(Crystal::ASTNode)
+  def self.nodes_at_cursor(result : Crystal::Compiler::Result, location : Crystal::Location) : { Array(Crystal::ASTNode), Hash(String, { Crystal::Type?, Crystal::Location? }) }
     CursorVisitor.new(location).process(result)
   end
 
   record Definitions, node : Crystal::ASTNode, locations : Array({Crystal::Location, Crystal::Location})?
 
   def self.definitions_at_cursor(result : Crystal::Compiler::Result, location : Crystal::Location) : Definitions?
-    nodes = CursorVisitor.new(location).process(result)
+    nodes, context = CursorVisitor.new(location).process(result)
     nodes.last?.try { |node|
       LSP::Log.debug { "Class of node at cursor: #{node.class} " }
       locations = begin
@@ -117,13 +117,23 @@ module Crystalline::Analysis
             )
             {location, end_location}
           end
-          # elsif (typ = node.type).responds_to?(:location) && (type_loc = typ.location)
-          #   type_end_loc = typ.end_location || Crystal::Location.new(
-          #     type_loc.filename,
-          #     line_number: type_loc.line_number + 1,
-          #     column_number: 0
-          #   )
-          #   [{ type_loc, type_end_loc }]
+        elsif node.is_a? Crystal::Var
+          if definition = context[node.to_s]?
+            _, location = definition
+            [{location, location}] if location
+          end
+        elsif node.is_a? Crystal::InstanceVar
+          if ivar = context["self"]?.try &.[0].try &.lookup_instance_var? node.name
+            if location = ivar.location
+              [{ location, location }]
+            end
+          end
+        elsif node.is_a? Crystal::ClassVar
+          if cvar = context["self"]?.try &.[0].try &.all_class_vars[node.name]? #lookup_raw_class_var? node.name
+            if (location = cvar.location)
+              [{ location, location }]
+            end
+          end
         end
       end
 

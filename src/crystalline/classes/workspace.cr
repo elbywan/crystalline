@@ -224,7 +224,7 @@ class Crystalline::Workspace
     )
     result.try { |r|
       Analysis.nodes_at_cursor(r, location)
-    }.try do |nodes|
+    }.try do |nodes, context|
       n = nodes.last?
       contents = [] of String
 
@@ -233,6 +233,7 @@ class Crystalline::Workspace
       # LSP::Log.info { "Node type: #{n.try &.type?}" }
       # LSP::Log.info { "Node type class: #{n.try &.type?.try &.class}" }
       # LSP::Log.info { "Nodes classes: #{nodes.map &.class}"}
+      # LSP::Log.info { "Context: #{context}" }
 
       if n.is_a? Crystal::Def || n.is_a? Crystal::Macro
         contents << code_markdown(format_def(n), language: "crystal")
@@ -434,7 +435,7 @@ class Crystalline::Workspace
     #   LSP::Log.info { "Node type: #{n.type}" }
     # }
 
-    nodes = Analysis.nodes_at_cursor(result, location)
+    nodes, _ = Analysis.nodes_at_cursor(result, location)
     nodes.last?.try do |n|
       completion_items = [] of LSP::CompletionItem
 

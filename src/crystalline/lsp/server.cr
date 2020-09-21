@@ -160,9 +160,9 @@ class LSP::Server
           controller.on_notification(message.as(LSP::NotificationMessage))
         end
       elsif message.is_a? LSP::ResponseMessage
+        response_message = message.as(LSP::ResponseMessage)
+        original_message = requests_sent.delete(response_message.id)
         if controller.responds_to? :on_response
-          response_message = message.as(LSP::ResponseMessage)
-          original_message = requests_sent.delete(response_message.id)
           Async.spawn_on_different_thread(thread) do
             controller.on_response(response_message, original_message.try &.as(RequestMessage))
           rescue e
@@ -182,11 +182,15 @@ class LSP::Server
 
     initialize_routine(controller)
 
-    Log.info { "Crystalline LSP server is ready." }
-
     if controller.responds_to? :when_ready
-      controller.when_ready
+      begin
+        controller.when_ready
+      rescue e
+        Log.warn(exception: e) { "Error during initialization: #{e}" }
+      end
     end
+
+    Log.info { "Crystalline LSP server is ready." }
 
     message_loop(controller)
   end

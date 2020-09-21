@@ -5,6 +5,8 @@ module Crystalline
     include Crystal::TypedDefProcessor
 
     getter nodes : Array(Crystal::ASTNode)
+    getter context = Hash(String, {Crystal::Type?, Crystal::Location?}).new
+    @scoped_vars = Hash(String, {Crystal::Type?, Crystal::Location?}).new
     @top_level = false
 
     def initialize(@target_location : Crystal::Location)
@@ -20,7 +22,7 @@ module Crystalline
         result.node.accept(self)
       end
 
-      @nodes
+      {@nodes, @context}
     end
 
     private def process_type(type : Crystal::Type) : Nil
@@ -35,6 +37,27 @@ module Crystalline
       @nodes.reverse.find { |elt|
         elt.responds_to?(:end_location) && elt.end_location
       }.try &.end_location
+    end
+
+    def visit_any(node : Crystal::Def | Crystal::Assign)
+      if node.is_a? Crystal::Assign
+        target = node.target
+        @scoped_vars[target.to_s] = {node.type?, node.location}
+      elsif node.is_a? Crystal::Def
+        node.args.each do |arg|
+          @scoped_vars[arg.name] = {arg.type?, arg.location || node.location}
+        end
+        node.vars.try do |vars|
+          vars.each do |name, meta_var|
+            @scoped_vars[name] = {meta_var.type?, meta_var.location || node.location}
+          end
+        end
+      end
+      true
+    end
+
+    def end_visit_any(node : Crystal::Def)
+      @scoped_vars.clear
     end
 
     def visit(node)
@@ -54,6 +77,7 @@ module Crystalline
 
       if contains_node
         @nodes << node
+        @context = @scoped_vars.dup
         true
       elsif @top_level && @nodes.empty?
         if node.is_a? Crystal::Require
