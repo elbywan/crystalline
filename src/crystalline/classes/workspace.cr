@@ -405,10 +405,10 @@ class Crystalline::Workspace
       # LSP::Log.info { "Node type class: #{n.type?.try &.class}" }
       # LSP::Log.info { "Node type defs: #{n.type?.try &.defs}" }
 
-      # range = LSP::Range.new({
-      #   start: LSP::Position.new({line: position.line, character: position.character - left_offset}),
-      #   end:   LSP::Position.new({line: position.line, character: position.character + right_offset}),
-      # })
+      range = LSP::Range.new({
+        start: LSP::Position.new({line: position.line, character: position.character - left_offset + 1}),
+        end:   LSP::Position.new({line: position.line, character: position.character + right_offset}),
+      })
 
       case trigger_character
       when "."
@@ -418,18 +418,18 @@ class Crystalline::Workspace
             owner_prefix ||= ""
             documentation = (owner_prefix + (definition.doc || ""))
 
-            # text_edit = LSP::TextEdit.new({
-            #   range:    range,
-            #   new_text: def_name,
-            # })
+            text_edit = LSP::TextEdit.new({
+              range:    range,
+              new_text: def_name,
+            })
 
             completion_items << LSP::CompletionItem.new({
-              label:       format_def(definition, short: true),
-              insert_text:  def_name,
-              kind:        LSP::CompletionItemKind::Function,
-              filter_text: def_name,
-              detail:      format_def(definition),
-              # text_edit: text_edit,
+              label:         format_def(definition, short: true),
+              insert_text:   def_name,
+              kind:          LSP::CompletionItemKind::Function,
+              filter_text:   def_name,
+              detail:        format_def(definition),
+              text_edit:     text_edit,
               sort_text:     (nesting + 1).chr.to_s + def_name,
               documentation: documentation.try { |doc|
                 LSP::MarkupContent.new({
@@ -445,18 +445,18 @@ class Crystalline::Workspace
             owner_prefix ||= ""
             documentation = (owner_prefix + (macro_def.doc || ""))
 
-            # text_edit = LSP::TextEdit.new({
-            #   range:    range,
-            #   new_text: macro_name,
-            # })
+            text_edit = LSP::TextEdit.new({
+              range:    range,
+              new_text: macro_name,
+            })
 
             completion_items << LSP::CompletionItem.new({
-              label:       format_def(macro_def, short: true),
-              insert_text: macro_name,
-              kind:        LSP::CompletionItemKind::Method,
-              filter_text: macro_name,
-              detail:      format_def(macro_def),
-              # text_edit: text_edit,
+              label:         format_def(macro_def, short: true),
+              insert_text:   macro_name,
+              kind:          LSP::CompletionItemKind::Method,
+              filter_text:   macro_name,
+              detail:        format_def(macro_def),
+              text_edit:     text_edit,
               sort_text:     (nesting + 1).chr.to_s + macro_name,
               documentation: documentation.try { |doc|
                 LSP::MarkupContent.new({
