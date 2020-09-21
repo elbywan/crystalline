@@ -99,9 +99,9 @@ targets:
     main: src/entry.cr
 ```
 
-Then every file required by the compilation of `src/entry.cr` are going to be considered as "workspace dependencies" and trigger the compilation of `src/entry.cr`.
+With the configuration above, every file required by `src/entry.cr` will use `src/entry.cr` as the entry point.
 
-If this `shard.yml` entry is not present, or if the file is not considered a "workspace dependency" `crystalline` will use it as the entry point.
+If this `shard.yml` entry is not present, or if the file is not part of the main dependency tree then `crystalline` will use the file itself as the entry point.
 
 **To override this behaviour**, you can add a configuration key in the `shard.yml` file.
 
@@ -110,7 +110,7 @@ crystalline:
   main: .crystalline_main.cr
 ```
 
-This can be extremely important to understand when you are writing a code library (meaning that your own library code will not call any of its own methods - which will prevent the code analysis). In this case, and if you are writing `specs`, you can just point to a file that require the specs and it will use it as the entry point.
+This can be extremely important to understand when you are writing a code library that does not call any of its own methods - it will skip code analysis. In this case, and if you are writing `specs`, you should point to a file that require the specs (or anything calling the library) and then `crystalline` will use it as the entry point.
 
 ```crystal
 # Contents of a file at the root of the project.
