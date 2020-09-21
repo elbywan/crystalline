@@ -14,7 +14,6 @@ class LSP::Server
   getter server_capabilities : LSP::ServerCapabilities
   getter requests_sent : Hash(RequestMessage::RequestId, LSP::Message) = {} of RequestMessage::RequestId => LSP::Message
   @max_request_id = Atomic(Int64).new(0)
-  @in_lock = Mutex.new(:reentrant)
   @out_lock = Mutex.new(:reentrant)
   getter thread : Thread
 
@@ -135,7 +134,7 @@ class LSP::Server
 
   private def message_loop(controller)
     loop do
-      message = @in_lock.synchronize { self.class.read(@input) }
+      message = self.class.read(@input)
 
       raise LSP::Exception.new(code: :invalid_request, message: "Server is shutting down.") if @shutdown
       exit(0) if message.is_a? LSP::ExitNotification

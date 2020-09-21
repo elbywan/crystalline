@@ -15,6 +15,7 @@ class Crystalline::Controller
     workspace.compile(@server)
   end
 
+  # The compiler unfortunately prevents doing this for the time being:
   # def on_request(message : LSP::RequestMessage(T)) : T forall T
   def on_request(message : LSP::RequestMessage)
     case message

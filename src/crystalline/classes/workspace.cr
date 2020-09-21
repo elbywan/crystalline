@@ -59,7 +59,7 @@ class Crystalline::Workspace
   def save_document(server : LSP::Server, params : LSP::DidSaveTextDocumentParams)
     file_uri = params.text_document.uri
     @result_cache.invalidate(file_uri)
-    self.compile(server, URI.parse file_uri)
+    Async.spawn_on_different_thread(server.thread) { self.compile(server, URI.parse file_uri) }
   end
 
   def format_document(params : LSP::DocumentFormattingParams) : {String, TextDocument}?
