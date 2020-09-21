@@ -175,7 +175,7 @@ class Crystalline::Workspace
     sync_channel.try &.receive
   end
 
-  private def format_def(d : Crystal::Def | Crystal::Macro)
+  private def format_def(d : Crystal::Def | Crystal::Macro, *, short = false)
     arguments = d.args.map &.to_s
     if block_arg = d.block_arg
       arguments << block_arg.to_s
@@ -188,7 +188,11 @@ class Crystalline::Workspace
       # LSP::Log.error(exception: e) { e.to_s }
       "Nil"
     end
-    "#{d.visibility.to_s.downcase} #{d.name}(#{arguments.join ", "}) : #{type}"
+    if short
+      "#{d.name} (#{arguments.join ", "}) : #{type}"
+    else
+      "#{d.visibility.to_s.downcase} #{d.name}(#{arguments.join ", "}) : #{type}"
+    end
   rescue e
     # LSP::Log.error(exception: e) { e.to_s}
     d.to_s
@@ -401,10 +405,10 @@ class Crystalline::Workspace
       # LSP::Log.info { "Node type class: #{n.type?.try &.class}" }
       # LSP::Log.info { "Node type defs: #{n.type?.try &.defs}" }
 
-      range = LSP::Range.new({
-        start: LSP::Position.new({line: position.line, character: position.character - left_offset}),
-        end:   LSP::Position.new({line: position.line, character: position.character + right_offset}),
-      })
+      # range = LSP::Range.new({
+      #   start: LSP::Position.new({line: position.line, character: position.character - left_offset}),
+      #   end:   LSP::Position.new({line: position.line, character: position.character + right_offset}),
+      # })
 
       case trigger_character
       when "."
@@ -420,9 +424,10 @@ class Crystalline::Workspace
             # })
 
             completion_items << LSP::CompletionItem.new({
-              label:  def_name,
-              kind:   LSP::CompletionItemKind::Function,
-              detail: format_def(definition),
+              label:       format_def(definition, short: true),
+              kind:        LSP::CompletionItemKind::Function,
+              filter_text: def_name,
+              detail:      format_def(definition),
               # text_edit: text_edit,
               sort_text:     (nesting + 1).chr.to_s + def_name,
               documentation: documentation.try { |doc|
@@ -445,9 +450,10 @@ class Crystalline::Workspace
             # })
 
             completion_items << LSP::CompletionItem.new({
-              label:  macro_name,
-              kind:   LSP::CompletionItemKind::Method,
-              detail: format_def(macro_def),
+              label:       format_def(macro_def, short: true),
+              kind:        LSP::CompletionItemKind::Method,
+              filter_text: macro_name,
+              detail:      format_def(macro_def),
               # text_edit: text_edit,
               sort_text:     (nesting + 1).chr.to_s + macro_name,
               documentation: documentation.try { |doc|
@@ -478,7 +484,7 @@ class Crystalline::Workspace
             # })
 
             completion_items << LSP::CompletionItem.new({
-              label:         type_string,
+              label: type_string,
               # text_edit:     text_edit,
               kind:          LSP::CompletionItemKind::Module,
               documentation: type.doc.try { |doc|
