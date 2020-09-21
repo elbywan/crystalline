@@ -7,7 +7,7 @@ module Crystalline
   VERSION = "0.1.0"
 
   SERVER_CAPABILITIES = LSP::ServerCapabilities.new({
-    text_document_sync:                 LSP::TextDocumentSyncKind::Full,
+    text_document_sync:                 LSP::TextDocumentSyncKind::Incremental,
     document_formatting_provider:       true,
     document_range_formatting_provider: true,
     completion_provider:                LSP::CompletionOptions.new({

@@ -42,8 +42,8 @@ class Crystalline::Workspace
   def update_document(params : LSP::DidChangeTextDocumentParams)
     file_uri = params.text_document.uri
     @opened_documents[file_uri]?.try { |document|
-      params.content_changes.last?.try { |last_change|
-        document.contents = last_change.text
+      params.content_changes.each { |change|
+        document.update_contents(change.text, change.range)
       }
     }
     @result_cache.invalidate(file_uri)
