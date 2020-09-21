@@ -69,7 +69,7 @@ module Crystalline::Analysis
     nodes.last?
   end
 
-  def self.nodes_at_cursor(result : Crystal::Compiler::Result, location : Crystal::Location) : { Array(Crystal::ASTNode), Hash(String, { Crystal::Type?, Crystal::Location? }) }
+  def self.nodes_at_cursor(result : Crystal::Compiler::Result, location : Crystal::Location) : {Array(Crystal::ASTNode), Hash(String, {Crystal::Type?, Crystal::Location?})}
     CursorVisitor.new(location).process(result)
   end
 
@@ -125,13 +125,13 @@ module Crystalline::Analysis
         elsif node.is_a? Crystal::InstanceVar
           if ivar = context["self"]?.try &.[0].try &.lookup_instance_var? node.name
             if location = ivar.location
-              [{ location, location }]
+              [{location, location}]
             end
           end
         elsif node.is_a? Crystal::ClassVar
-          if cvar = context["self"]?.try &.[0].try &.all_class_vars[node.name]? #lookup_raw_class_var? node.name
+          if cvar = context["self"]?.try &.[0].try &.all_class_vars[node.name]? # lookup_raw_class_var? node.name
             if (location = cvar.location)
-              [{ location, location }]
+              [{location, location}]
             end
           end
         end
