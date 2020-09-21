@@ -7,6 +7,7 @@ module Crystalline
     getter nodes : Array(Crystal::ASTNode)
     getter context = Hash(String, {Crystal::Type?, Crystal::Location?}).new
     @scoped_vars = Hash(String, {Crystal::Type?, Crystal::Location?}).new
+    @previous_vars = Hash(String, {Crystal::Type?, Crystal::Location?}).new
     @top_level = false
 
     def initialize(@target_location : Crystal::Location)
@@ -39,11 +40,22 @@ module Crystalline
       }.try &.end_location
     end
 
-    def visit_any(node : Crystal::Def | Crystal::Assign)
-      if node.is_a? Crystal::Assign
+    def visit_any(node : Crystal::Def | Crystal::Assign | Crystal::Block)
+      case node
+      when Crystal::Assign
         target = node.target
         @scoped_vars[target.to_s] = {node.type?, node.location}
-      elsif node.is_a? Crystal::Def
+      when Crystal::Def
+        node.args.each do |arg|
+          @scoped_vars[arg.name] = {arg.type?, arg.location || node.location}
+        end
+        node.vars.try do |vars|
+          vars.each do |name, meta_var|
+            @scoped_vars[name] = {meta_var.type?, meta_var.location || node.location}
+          end
+        end
+      when Crystal::Block
+        @previous_vars = @scoped_vars.dup
         node.args.each do |arg|
           @scoped_vars[arg.name] = {arg.type?, arg.location || node.location}
         end
@@ -53,11 +65,15 @@ module Crystalline
           end
         end
       end
-      true
+      super
     end
 
     def end_visit_any(node : Crystal::Def)
       @scoped_vars.clear
+    end
+
+    def end_visit_any(node : Crystal::Block)
+      @scoped_vars = @previous_vars
     end
 
     def visit(node)
