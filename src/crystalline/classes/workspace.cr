@@ -342,61 +342,39 @@ class Crystalline::Workspace
     # LSP::Log.info { "completion: #{trigger_character}"}
 
     document_lines = text_document.contents.lines(chomp: false)
-    # if trigger_character
-    #   prefix = document_lines[position.line][0...position.character].rstrip(trigger_character)
-    #   suffix = document_lines[position.line][(position.character)..]?
-    #   left_offset = position.character - prefix.size
-    #   right_offset = 0
-    # else
-      left_offset = 0
-      right_offset = 0
+    left_offset = 0
+    right_offset = 0
+    truncate_line = false
 
-      if trigger_character
-        prefix = document_lines[position.line][0...position.character].rstrip(trigger_character)
-        left_offset = position.character - prefix.size
-      else
-        document_lines[position.line][0...position.character].each_char_with_index { |char, index|
-          case char
-          when '.', ':', ' ', '(', ')', '[', ']', '{', '}', ';'
-            trigger_character = char.to_s
-            left_offset = position.character - index
-          end
-        }
-        prefix = document_lines[position.line][0...(position.character - left_offset)]
-      end
-
-      # if trigger_character
-      #   prefix = document_lines[position.line][0...position.character].rstrip(trigger_character)
-      # else
-      #   prefix = document_lines[position.line][0...position.character]
-      # end
-      # suffix = document_lines[position.line][(position.character)..]?
-
-      # prefix = document_lines[position.line][0...(position.character - left_offset)]
-      suffix = document_lines[position.line][(position.character)..]?
-
-      suffix.try &.each_char_with_index { |char, index|
-        unless char.ascii_alphanumeric? || char == '_' || char == '?' || char == '!' || char == ':'
-          right_offset = index
-          break
+    if trigger_character
+      prefix = document_lines[position.line][0...position.character].rstrip(trigger_character)
+      left_offset = position.character - prefix.size
+    else
+      document_lines[position.line][0...position.character].each_char_with_index { |char, index|
+        unless char.ascii_alphanumeric? || char == '_' || char == '?' || char == '!'
+          trigger_character = char.to_s
+          left_offset = position.character - index
         end
-      # case char
-      # when ' ', ')', ']', '}', '\n', ';', '(', '{', '['
-      #   right_offset = index
-      #   break
-      # when '.', ':'
-      #   right_offset = index - 1
-      #   break
-      # end
       }
-      suffix = suffix.try &.[right_offset...]?
-    # end
+      prefix = document_lines[position.line][0...(position.character - left_offset)]
+    end
+
+    suffix = document_lines[position.line][(position.character)..]?
+
+    suffix.try &.each_char_with_index { |char, index|
+      unless char.ascii_alphanumeric? || char == '_' || char == '?' || char == '!' || char == ':'
+        truncate_line = true if char == '(' || char == '{' || char == '['
+        right_offset = index
+        break
+      end
+    }
+    suffix = suffix.try &.[right_offset...]?
 
     # LSP::Log.info { "prefix(left offset #{left_offset}): #{prefix}"}
     # LSP::Log.info { "suffix(right offset #{right_offset}): #{suffix}"}
     # LSP::Log.info { "trigger character: #{trigger_character}"}
 
-    document_lines[position.line] = prefix + (suffix || "")
+    document_lines[position.line] = prefix + (!truncate_line ? (suffix || "\n") : "\n")
     text_overrides = {
       file_uri.to_s => document_lines.join,
     }
@@ -412,28 +390,6 @@ class Crystalline::Workspace
 
     result = self.compile(server, file_uri, in_memory: true, synchronous: true, ignore_diagnostics: false, wants_doc: true, text_overrides: text_overrides, permissive: true)
     return unless result
-
-    # source = Crystal::Compiler::Source.new(target.decoded_path, document_lines.join)
-    # program = result.program
-    # parser = Crystal::Parser.new(source.code, program.string_pool)
-    # parser.filename = source.filename
-    # parser.wants_doc = true
-    # nodes = parser.parse
-
-    # LSP::Log.info { "Parser result: #{!nodes.nil?}"}
-
-    # semantic_ast = program.semantic(nodes)
-
-    # LSP::Log.info { "Semantic AST: #{!semantic_ast.nil?}"}
-
-    # semantic_ast.try { |ast|
-    #   visitor = CursorVisitor.new(location)
-    #   ast.accept(visitor)
-    #   visitor.nodes.last?
-    # }.try { |n|
-    #   LSP::Log.info { "Node at cursor: #{n}" }
-    #   LSP::Log.info { "Node type: #{n.type}" }
-    # }
 
     nodes, _ = Analysis.nodes_at_cursor(result, location)
     nodes.last?.try do |n|
@@ -468,7 +424,7 @@ class Crystalline::Workspace
               kind:   LSP::CompletionItemKind::Function,
               detail: format_def(definition),
               # text_edit: text_edit,
-              sort_text: (nesting + 1).chr.to_s + def_name,
+              sort_text:     (nesting + 1).chr.to_s + def_name,
               documentation: documentation.try { |doc|
                 LSP::MarkupContent.new({
                   kind:  LSP::MarkupKind::MarkDown,
@@ -483,12 +439,17 @@ class Crystalline::Workspace
             owner_prefix ||= ""
             documentation = (owner_prefix + (macro_def.doc || ""))
 
+            # text_edit = LSP::TextEdit.new({
+            #   range:    range,
+            #   new_text: macro_name,
+            # })
+
             completion_items << LSP::CompletionItem.new({
               label:  macro_name,
               kind:   LSP::CompletionItemKind::Method,
               detail: format_def(macro_def),
               # text_edit: text_edit,
-              sort_text: (nesting + 1).chr.to_s + macro_name,
+              sort_text:     (nesting + 1).chr.to_s + macro_name,
               documentation: documentation.try { |doc|
                 LSP::MarkupContent.new({
                   kind:  LSP::MarkupKind::MarkDown,
@@ -511,14 +472,14 @@ class Crystalline::Workspace
           Analysis.all_submodules(result, node_type).uniq(&.to_s).each { |type|
             type_string = type.to_s
 
-            text_edit = LSP::TextEdit.new({
-              range:    range,
-              new_text: type_string.lchop(node_type.to_s),
-            })
+            # text_edit = LSP::TextEdit.new({
+            #   range:    range,
+            #   new_text: type_string.lchop(node_type.to_s),
+            # })
 
             completion_items << LSP::CompletionItem.new({
               label:         type_string,
-              text_edit:     text_edit,
+              # text_edit:     text_edit,
               kind:          LSP::CompletionItemKind::Module,
               documentation: type.doc.try { |doc|
                 LSP::MarkupContent.new({
@@ -568,7 +529,6 @@ class Crystalline::Workspace
         selected_element.preselect = true
         completion_items[selected_element_index] = selected_element
       end
-
 
       LSP::CompletionList.new({
         is_incomplete: false,
