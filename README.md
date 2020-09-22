@@ -45,6 +45,7 @@ shards build crystalline --release --no-debug --progress -Dpreview_mt
 ```sh
 git clone https://github.com/elbywan/crystalline
 cd crystalline
+mkdir bin
 crystal build ./src/crystalline.cr  -o ./bin/crystalline --release --no-debug --progress  -Dpreview_mt
 # Then, copy or move the binary to any location covered by your $PATH. For instance:
 mv ./bin/crystalline /usr/local/bin
