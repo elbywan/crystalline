@@ -12,6 +12,6 @@ module LSP
     include Initializer
     include JSON::Serializable
 
-    property id : Int32 | String
+    property id : RequestMessage::RequestId
   end
 end

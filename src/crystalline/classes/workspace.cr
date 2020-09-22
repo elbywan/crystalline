@@ -39,7 +39,7 @@ class Crystalline::Workspace
     @opened_documents[raw_uri] = document
   end
 
-  def update_document(params : LSP::DidChangeTextDocumentParams)
+  def update_document(server : LSP::Server, params : LSP::DidChangeTextDocumentParams)
     file_uri = params.text_document.uri
     @opened_documents[file_uri]?.try { |document|
       params.content_changes.each { |change|
@@ -50,6 +50,9 @@ class Crystalline::Workspace
     entry_point?.try { |entry|
       @result_cache.invalidate(entry.to_s)
     } if inside_workspace?(URI.parse file_uri)
+    # Async.spawn_on_different_thread(server.thread) {
+    #   self.compile(server, URI.parse(file_uri), in_memory: true )
+    # }
   end
 
   def close_document(params : LSP::DidCloseTextDocumentParams)
@@ -82,9 +85,6 @@ class Crystalline::Workspace
     entry_point? && dependencies.size > 0 && file_uri.decoded_path.in?(dependencies)
   end
 
-  @compilation_queue = Set(String).new
-  @compilation_queue_lock = Mutex.new
-
   def recalculate_dependencies(server)
     return unless target = entry_point?
 
@@ -96,7 +96,8 @@ class Crystalline::Workspace
     nil
   end
 
-  def compile(server : LSP::Server, file_uri : URI? = nil, *, in_memory = false, synchronous = false, ignore_diagnostics = false, wants_doc = false, text_overrides = nil, permissive = false, top_level = false)
+  @@compilation_lock = Mutex.new
+  def compile(server : LSP::Server, file_uri : URI? = nil, *, in_memory = false, ignore_diagnostics = false, wants_doc = false, text_overrides = nil, permissive = false, top_level = false)
     return nil unless file_uri || entry_point?
 
     recalculate_dependencies(server) if dependencies.size < 2
@@ -117,62 +118,57 @@ class Crystalline::Workspace
       )
     end
 
-    @compilation_queue_lock.synchronize do
-      if @compilation_queue.includes? target.decoded_path
-        return nil
-      else
-        @compilation_queue.add(target.decoded_path)
+    target_string = target.to_s
+    if @result_cache.exists?(target_string) && !@result_cache.invalidated?(target_string)
+      return @result_cache.get(target_string)
+    end
+
+    @@compilation_lock.synchronize do
+      if @result_cache.exists?(target_string) && !@result_cache.invalidated?(target_string)
+        return @result_cache.get(target_string)
       end
-    end
 
-    file_overrides = nil
-    sources = nil
-    if in_memory
-      file_overrides = Hash(String, String).new
-      @opened_documents.each { |uri_str, text_document|
-        contents = text_overrides.try(&.[uri_str]?) || text_document.contents
-        if target.to_s == uri_str
-          sources = [
-            Crystal::Compiler::Source.new(target.decoded_path, contents),
-          ]
-        end
-        file_path = URI.parse(uri_str).decoded_path
-        file_overrides[file_path] = contents
-      }
-    end
-
-    if synchronous
       sync_channel = Channel(Crystal::Compiler::Result?).new
-    end
 
-    progress.report(server) do
-      result = @result_cache.get(target.to_s)
-      if result
-        @compilation_queue_lock.synchronize {
-          @compilation_queue.delete target.decoded_path
-        }
-      else
-        result = Analysis.compile(server, sources.try { |s| s } || target, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, permissive: permissive, top_level: top_level) {
-          @compilation_queue_lock.synchronize {
-            @compilation_queue.delete target.decoded_path
+      progress.report(server) do
+        file_overrides = nil
+        sources = nil
+        compilation_start = @result_cache.monotonic_now
+        if in_memory
+          file_overrides = Hash(String, String).new
+          @opened_documents.each { |uri_str, text_document|
+            contents = text_overrides.try(&.[uri_str]?) || text_document.contents
+            if target_string == uri_str
+              sources = [
+                Crystal::Compiler::Source.new(target.decoded_path, contents),
+              ]
+            end
+            file_path = URI.parse(uri_str).decoded_path
+            file_overrides[file_path] = contents
           }
-        }
-      end
-
-      if result
-        unless external_file
-          @dependencies = result.program.requires
         end
-        @result_cache.set(target.to_s, result)
-        "Completed successfully."
-      else
-        "Completed with errors."
-      end
-    ensure
-      sync_channel.try &.send(result)
-    end
+        result = Analysis.compile(server, sources.try { |s| s } || target, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, permissive: permissive, top_level: top_level)
+        @result_cache.set(target_string, result, unless_invalidated_since: compilation_start)
 
-    sync_channel.try &.receive
+        if result
+          unless external_file
+            @dependencies = result.program.requires
+          end
+          "Completed successfully."
+        else
+          "Completed with errors."
+        end
+      ensure
+        sync_channel.send(result)
+      end
+
+      select
+      when result = sync_channel.receive
+        result
+      when timeout 60.seconds
+        nil
+      end
+    end
   end
 
   private def format_def(d : Crystal::Def | Crystal::Macro, *, short = false)
@@ -220,7 +216,7 @@ class Crystalline::Workspace
   end
 
   def hover(server : LSP::Server, file_uri : URI, position : LSP::Position)
-    result = self.compile(server, file_uri, in_memory: true, synchronous: true, ignore_diagnostics: true, wants_doc: true, permissive: true)
+    result = self.compile(server, file_uri, in_memory: true, ignore_diagnostics: true, wants_doc: true, permissive: true)
     location = Crystal::Location.new(
       file_uri.decoded_path,
       line_number: position.line + 1,
@@ -289,7 +285,7 @@ class Crystalline::Workspace
   end
 
   def definitions(server : LSP::Server, file_uri : URI, position : LSP::Position)
-    result = self.compile(server, file_uri, in_memory: true, synchronous: true, ignore_diagnostics: true, wants_doc: true, permissive: true)
+    result = self.compile(server, file_uri, in_memory: true, ignore_diagnostics: true, wants_doc: true, permissive: true)
     location = Crystal::Location.new(
       file_uri.decoded_path,
       line_number: position.line + 1,
@@ -392,7 +388,7 @@ class Crystalline::Workspace
     # Temporary until on the fly context completion can be handled
     return unless trigger_character == "." || trigger_character == ":"
 
-    result = self.compile(server, file_uri, in_memory: true, synchronous: true, ignore_diagnostics: false, wants_doc: true, text_overrides: text_overrides, permissive: true)
+    result = self.compile(server, file_uri, in_memory: true, ignore_diagnostics: false, wants_doc: true, text_overrides: text_overrides, permissive: true)
     return unless result
 
     nodes, _ = Analysis.nodes_at_cursor(result, location)
