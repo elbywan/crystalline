@@ -78,6 +78,7 @@ env LLVM_CONFIG=/usr/local/opt/llvm/bin/llvm-config
 # For Example:
 env LLVM_CONFIG=/usr/local/opt/llvm/bin/llvm-config crystal build ./src/crystalline.cr  -o ./bin/crystalline --release --no-debug -Dpreview_mt
 ```
+> Replace `env` by `export` on Debian and derived (Ubuntu, Mint, ...)
 
 #### ld: library not found for -llibxml2.tbd
 
