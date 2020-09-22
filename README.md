@@ -50,7 +50,9 @@ crystal build ./src/crystalline.cr  -o ./bin/crystalline --release --no-debug --
 mv ./bin/crystalline /usr/local/bin
 ```
 
-### llvm-config
+### Known Issues
+
+#### llvm-config path
 
 `llvm` is required in order to build `crystalline`, if you get the following error message it means that the crystal compiler is unable to locate the `llvm-config` binary:
 
@@ -67,7 +69,7 @@ Error: error executing command: "" --version, got exit status 127
 
 This can be solved by adding the location of the `llvm-config` binary to the `LLVM_CONFIG` environment variable. (or the containing directory to the `PATH` env. variable)
 
-For instance on a typical MacOS setup, prefixing the command with the following declaration would solve the issue:
+For instance on a typical macOS setup, prefixing the command with the following declaration would solve the issue:
 
 ```sh
 # Prepend the command with this:
@@ -75,6 +77,26 @@ env LLVM_CONFIG=/usr/local/opt/llvm/bin/llvm-config
 # For Example:
 env LLVM_CONFIG=/usr/local/opt/llvm/bin/llvm-config crystal build ./src/crystalline.cr  -o ./bin/crystalline --release --no-debug -Dpreview_mt
 ```
+
+#### ld: library not found for -llibxml2.tbd
+
+LLVM **10.0.1** has some issues when reporting required system libraries on macOS.
+
+More info: [here](https://github.com/ziglang/zig/issues/6087)
+
+```sh
+# Wrong: -llibxml2.tbd
+$ llvm-config --system-libs
+-lm -lz -lcurses -llibxml2.tbd
+# `liblibxml2.tbd.dylib` is unlikely to be found during compilation,
+# hence the "library not found" error…
+```
+
+A hacky solution until llvm produces a solution would be to add a symbolic link to the correct shared library file:
+
+`ln -s /usr/lib/libxml2.2.dylib /usr/local/lib/liblibxml2.tbd.dylib`
+
+Or just use a different LLVM major version until this issue is fixed upstream.
 
 ## Usage
 
@@ -134,7 +156,7 @@ Triggered when typing the `.` or `:` characters and list (depending on the targe
 
 A whole document or a text selection.
 
-#### Goto definition
+#### Go to definition
 
 By clicking on a symbol with the Cmd or Ctrl key pressed (editor/platform dependent).
 
