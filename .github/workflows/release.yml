@@ -63,7 +63,6 @@ jobs:
           draft: false
           prerelease: false
       - name: Attach linux binary
-        id: upload-release-asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -73,7 +72,6 @@ jobs:
           asset_name: crystalline_linux.gz
           asset_content_type: application/gzip
       - name: Attach macOS binary
-        id: upload-release-asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
