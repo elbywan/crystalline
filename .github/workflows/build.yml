@@ -1,0 +1,45 @@
+name: Build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  macos:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+    - name: Install Crystal
+      run: brew install openssl crystal
+    - name: Install dependencies
+      run: shards install --production
+    - name: Build the binary
+      env:
+        LLVM_CONFIG: /usr/local/opt/llvm/bin/llvm-config
+      run: |
+        ln -s /usr/lib/libxml2.2.dylib /usr/local/lib/liblibxml2.tbd.dylib
+        shards build crystalline --release --no-debug -Dpreview_mt --stats --progress
+    - name: Upload a Build Artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: crystalline_darwin
+        path: ./bin/crystalline
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Build the static binary
+        run: docker build -t crystalline .
+      - name: Copy binary to host
+        run: |
+          docker run -v $PWD:/app/host --rm crystalline:latest cp ./bin/crystalline ./host/crystalline
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: crystalline_linux
+          path: ./crystalline
