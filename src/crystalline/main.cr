@@ -2,9 +2,10 @@ require "log"
 require "./ext/*"
 require "./lsp/server"
 require "./*"
+require "version_from_shard"
 
 module Crystalline
-  VERSION = "0.1.0"
+  VersionFromShard.declare(__DIR__)
 
   SERVER_CAPABILITIES = LSP::ServerCapabilities.new({
     text_document_sync:                 LSP::TextDocumentSyncKind::Incremental,

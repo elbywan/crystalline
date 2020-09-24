@@ -4,3 +4,7 @@ shards:
     git: https://github.com/samueleaton/sentry.git
     version: 0.3.2+git.commit.edcafd89be2658a4bd306ca1096ef9918c727edf
 
+  version_from_shard:
+    git: https://github.com/hugopl/version_from_shard.git
+    version: 1.2.2
+

@@ -10,6 +10,10 @@ targets:
   sentry:
     main: lib/sentry/src/sentry_cli.cr
 
+dependencies:
+  version_from_shard:
+    github: hugopl/version_from_shard
+
 development_dependencies:
   sentry:
     github: samueleaton/sentry
