@@ -1,0 +1,85 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  macos:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+    - name: Install Crystal
+      run: brew install openssl crystal
+    - name: Install dependencies
+      run: shards install --production
+    - name: Build the binary
+      env:
+        LLVM_CONFIG: /usr/local/opt/llvm/bin/llvm-config
+      run: |
+        ln -s /usr/lib/libxml2.2.dylib /usr/local/lib/liblibxml2.tbd.dylib
+        shards build crystalline --release --no-debug -Dpreview_mt --stats --progress
+    - name: Upload a Build Artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: crystalline_darwin
+        path: ./bin/crystalline
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Build the static binary
+        run: docker build -t crystalline .
+      - name: Copy binary to host
+        run: |
+          docker run -v $PWD:/app/host --rm crystalline:latest cp ./bin/crystalline ./host/crystalline
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: crystalline_linux
+          path: ./crystalline
+    release:
+      needs: [macos, linux]
+      runs-on: ubuntu-latest
+      steps:
+        - name: Download artifacts
+          uses: actions/download-artifact@v2
+          with:
+            path: ./artifacts
+        - name: Compress artifacts
+          run: gzip -r ./artifacts
+        - name: Create release
+          id: create_release
+          uses: actions/create-release@v1
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          with:
+            tag_name: ${{ github.ref }}
+            release_name: Release ${{ github.ref }}
+            draft: false
+            prerelease: false
+        - name: Attach linux binary
+          id: upload-release-asset
+          uses: actions/upload-release-asset@v1
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          with:
+            upload_url: ${{ steps.create_release.outputs.upload_url }}
+            asset_path: ./artifacts/crystalline_linux/crystalline.gz
+            asset_name: crystalline_linux.gz
+            asset_content_type: application/gzip
+        - name: Attach macOS binary
+          id: upload-release-asset
+          uses: actions/upload-release-asset@v1
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          with:
+            upload_url: ${{ steps.create_release.outputs.upload_url }}
+            asset_path: ./crystalline_darwin.gz
+            asset_name: crystalline_darwin.gz
+            asset_content_type: application/gzip
+
