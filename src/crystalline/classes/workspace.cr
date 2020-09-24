@@ -147,7 +147,7 @@ class Crystalline::Workspace
             file_overrides[file_path] = contents
           }
         end
-        result = Analysis.compile(server, sources.try { |s| s } || target, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, permissive: permissive, top_level: top_level)
+        result = Analysis.compile(server, sources || target, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, permissive: permissive, top_level: top_level)
         @result_cache.set(target_string, result, unless_invalidated_since: compilation_start)
 
         if result
@@ -178,19 +178,21 @@ class Crystalline::Workspace
     elsif d.is_a? Crystal::Def && d.yields
       arguments << "&block"
     end
-    type = begin
-      d.type?.to_s
-    rescue e
-      # LSP::Log.error(exception: e) { e.to_s }
-      "Nil"
-    end
+
+    # TODO: Find out how to get the return type of the body.
+    # LSP::Log.info { "return type: #{d.return_type if d.responds_to? :return_type}" }
+    # LSP::Log.info { "type: #{d.type?}" }
+    # LSP::Log.info { "body class: #{d.body.class}" }
+    # LSP::Log.info { "body type: #{d.body.type?}" }
+    return_type = ": #{d.return_type}" if d.responds_to?(:return_type) && !d.return_type.nil?
+
     if short
-      "#{d.name} (#{arguments.join ", "}) : #{type}"
+      "#{d.name} (#{arguments.join ", "})#{return_type}"
     else
-      "#{d.visibility.to_s.downcase} #{d.name}(#{arguments.join ", "}) : #{type}"
+      "#{d.visibility.to_s.downcase} #{d.name}(#{arguments.join ", "})#{return_type}"
     end
   rescue e
-    # LSP::Log.error(exception: e) { e.to_s}
+    # LSP::Log.error(exception: e) { e.to_s }
     d.to_s
   end
 
