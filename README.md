@@ -25,7 +25,9 @@
 
 ### Pre-built binaries
 
-#### Linux
+#### Latest Release
+
+##### Linux
 
 ```sh
 wget https://github.com/elbywan/crystalline/releases/latest/download/crystalline_linux.gz -O crystalline.gz &&\
@@ -33,13 +35,17 @@ gzip -d crystalline.gz &&\
 chmod u+x crystalline
 ```
 
-#### MacOS
+##### MacOS
 
 ```sh
 curl -L https://github.com/elbywan/crystalline/releases/latest/download/crystalline_darwin.gz -o crystalline.gz &&\
 gzip -d crystalline.gz &&\
 chmod u+x crystalline
 ```
+
+#### Specific commit
+
+[Binaries are uploaded as artifacts dring the CI build.](https://github.com/elbywan/crystalline/actions)
 
 ### Build from source
 
