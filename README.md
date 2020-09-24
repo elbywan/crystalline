@@ -21,9 +21,31 @@
 
 ## Installation
 
-**Warning: this can take a long time! (several minutes - up to 15 minutes, depending on your hardware)**
+*Recommended method is to download and use pre-built binaries when possible. Building from source does take a long time.*
 
-### Scoped install
+### Pre-built binaries
+
+#### Linux
+
+```sh
+wget https://github.com/elbywan/crystalline/releases/latest/download/crystalline_linux.gz -O crystalline.gz &&\
+gzip -d crystalline.gz &&\
+chmod u+x crystalline
+```
+
+#### MacOS
+
+```sh
+curl -L https://github.com/elbywan/crystalline/releases/latest/download/crystalline_darwin.gz -o crystalline.gz &&\
+gzip -d crystalline.gz &&\
+chmod u+x crystalline
+```
+
+### Build from source
+
+**Warning: this can take a long time! (several minutes - up to 20 minutes, depending on your hardware)**
+
+#### Scoped install
 
 In the `.shard.yml` file:
 
@@ -41,7 +63,7 @@ Then:
 shards build crystalline --release --no-debug --progress -Dpreview_mt
 ```
 
-### Global install
+#### Global install
 
 ```sh
 git clone https://github.com/elbywan/crystalline
@@ -50,9 +72,9 @@ mkdir bin
 crystal build ./src/crystalline.cr  -o ./bin/crystalline --release --no-debug --progress  -Dpreview_mt
 ```
 
-### Known Issues
+#### Known Issues
 
-#### llvm-config path
+- **llvm-config path**
 
 `llvm` is required in order to build `crystalline`, if you get the following error message it means that the crystal compiler is unable to locate the `llvm-config` binary:
 
@@ -79,7 +101,7 @@ env LLVM_CONFIG=/usr/local/opt/llvm/bin/llvm-config crystal build ./src/crystall
 ```
 > Replace `env` by `export` on Debian and derived (Ubuntu, Mint, ...)
 
-#### ld: library not found for -llibxml2.tbd
+- **ld: library not found for -llibxml2.tbd**
 
 LLVM **10.0.1** has some issues when reporting required system libraries on macOS.
 
