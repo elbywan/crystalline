@@ -45,7 +45,7 @@ chmod u+x crystalline
 
 #### Specific commit
 
-[Binaries are uploaded as artifacts dring the CI build.](https://github.com/elbywan/crystalline/actions)
+[Binaries are uploaded as artifacts during the CI build.](https://github.com/elbywan/crystalline/actions)
 
 ### Build from source
 
