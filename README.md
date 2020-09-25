@@ -78,9 +78,12 @@ mkdir bin
 crystal build ./src/crystalline.cr  -o ./bin/crystalline --release --no-debug --progress  -Dpreview_mt
 ```
 
-#### Known Issues
+#### Known Build Issues
 
-- **llvm-config path**
+*Potential errors when building from source.*
+
+<details><summary><strong>llvm-config path</strong></summary>
+<p>
 
 `llvm` is required in order to build `crystalline`, if you get the following error message it means that the crystal compiler is unable to locate the `llvm-config` binary:
 
@@ -107,7 +110,11 @@ env LLVM_CONFIG=/usr/local/opt/llvm/bin/llvm-config crystal build ./src/crystall
 ```
 > Replace `env` by `export` on Debian and derived (Ubuntu, Mint, ...)
 
-- **ld: library not found for -llibxml2.tbd**
+</p>
+</details>
+
+<details><summary><strong>ld: library not found for -llibxml2.tbd</strong></summary>
+<p>
 
 LLVM **10.0.1** has some issues when reporting required system libraries on macOS.
 
@@ -127,12 +134,15 @@ A hacky solution until llvm produces a solution would be to add a symbolic link 
 
 Or just use a different LLVM major version until this issue is fixed upstream.
 
+</p>
+</details>
+
 ## Usage
 
 `Crystalline` is meant to be used alongside an editor extension.
 
 For instance if you are a VSCode user, add the [Crystal Language extension](https://marketplace.visualstudio.com/items?itemName=crystal-lang-tools.crystal-lang).
-Then in the configuration, type the **absolute** location of the Crystalline binary in the following field:
+Then in the configuration, type the **absolute** location of the binary in the following field:
 
 ![vscode screen](assets/vscode_extension_screen.png)
 
