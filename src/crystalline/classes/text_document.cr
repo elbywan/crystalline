@@ -25,7 +25,9 @@ class Crystalline::TextDocument
     if range
       prefix = @inner_contents[range.start.line]?.try &.[...range.start.character].chomp || ""
       suffix = @inner_contents[range.end.line]?.try &.[range.end.character..]? || @inner_contents[range.end.line]? || ""
-      replacement_lines = (prefix + contents + suffix).lines(chomp: false)
+      replacement_lines = String.build { |str|
+        str << prefix << contents << suffix
+      }.lines(chomp: false)
       @inner_contents = (@inner_contents[...range.start.line]? || [] of String) + replacement_lines + (@inner_contents[range.end.line + 1...]? || [] of String)
     else
       self.contents = contents
