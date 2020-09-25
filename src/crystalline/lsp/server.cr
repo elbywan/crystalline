@@ -6,21 +6,35 @@ require "./response_message"
 require "./tools"
 require "./log"
 
+# A Language Server Protocol generic implementation.
+#
+# This server is basically an I/O loop receiving, replying, sending message and handling exceptions.
+# Actual actions are delegated to an external class.
 class LSP::Server
+  # True if the server is shutting down.
   @shutdown = false
 
+  # Input from which messages are received.
   getter input : IO
+  # Output to which the messages are sent.
   getter output : IO
+  # The broadcasted server capabilites.
   getter server_capabilities : LSP::ServerCapabilities
+  # A list of requests that were sent to clients to keep track of the ID and kind.
   getter requests_sent : Hash(RequestMessage::RequestId, LSP::Message) = {} of RequestMessage::RequestId => LSP::Message
+  # Incremental.
   @max_request_id = Atomic(Int64).new(0)
+  # Lock to prevent interleaving.
   @out_lock = Mutex.new(:reentrant)
+  # This server thread, that should not get blocked by all means.
   getter thread : Thread
 
+  # Dummy default server capabilites.
   DEFAULT_SERVER_CAPABILITIES = LSP::ServerCapabilities.new({
     text_document_sync: LSP::TextDocumentSyncKind::Incremental,
   })
 
+  # Initialize a new LSP Server with the provided options.
   def initialize(@input = STDIN, @output = STDOUT, @server_capabilities = DEFAULT_SERVER_CAPABILITIES)
     @thread = Thread.current
     LSP::Log.backend = LogBackend.new(self)
@@ -28,6 +42,7 @@ class LSP::Server
     # Log.backend = ::Log::IOBackend.new(File.new "./crystalline_logs.txt", mode: "a+")
   end
 
+  # Send a message to the client.
   def send(message : LSP::Message, *, do_not_log = false)
     if message.is_a? LSP::RequestMessage
       @requests_sent[message.id] = message
@@ -40,23 +55,27 @@ class LSP::Server
     }
   end
 
-  def send(client_messages : Array, *, do_not_log = false)
-    client_messages.each do |client_message|
-      send(message: client_message, do_not_log: do_not_log)
+  # Send an array of messages to the client.
+  def send(messages : Array, *, do_not_log = false)
+    messages.each do |message|
+      send(message: message, do_not_log: do_not_log)
     end
   end
 
+  # Reply to a *request* initiated by the client with the provided *result*.
   def reply(request : LSP::RequestMessage, *, result : T, do_not_log = false) forall T
     request.id = @max_request_id.add(1)
     response_message = LSP::ResponseMessage(T).new({id: request.id, result: result})
     send(message: response_message, do_not_log: do_not_log)
   end
 
+  # Reply to a *request* initiated by the client with an error message containing the *exception* details.
   def reply(request : LSP::RequestMessage, *, exception, do_not_log = false)
     response_message = LSP::ResponseMessage(Nil).new({id: request.id, error: LSP::ResponseError.new(exception)})
     send(message: response_message, do_not_log: do_not_log)
   end
 
+  # Read a client message and deserialize it.
   protected def self.read(io : IO)
     if io.responds_to? :blocking
       io.blocking = false
@@ -88,6 +107,8 @@ class LSP::Server
     io.read_fully(content)
     content_str = String.new(content)
 
+    # Successive deserialization steps because the messages structure overlap (they have similar fields).
+    # So we go from the stricter type and go down.
     begin
       message = LSP::RequestMessage.from_json(content_str)
     rescue
@@ -101,7 +122,8 @@ class LSP::Server
     message
   end
 
-  private def initialize_routine(controller)
+  # The initial handshake.
+  private def handshake(controller)
     loop do
       initialize_message = self.class.read(@input)
       if initialize_message.is_a? LSP::InitializeRequest
@@ -125,6 +147,8 @@ class LSP::Server
     end
   end
 
+  # Callback that gets executed when an exception is thrown.
+  # Takes care of replying to the *message* with the correct information extracted from the exception.
   private def on_exception(message, e)
     Log.error(exception: e) { e }
     if message.is_a? LSP::RequestMessage
@@ -132,10 +156,13 @@ class LSP::Server
     end
   end
 
-  private def message_loop(controller)
+  # The main I/O loop.
+  private def server_loop(controller)
     loop do
+      # Read a message.
       message = self.class.read(@input)
 
+      # Perform special actions if needed.
       raise LSP::Exception.new(code: :invalid_request, message: "Server is shutting down.") if @shutdown
       exit(0) if message.is_a? LSP::ExitNotification
 
@@ -145,6 +172,7 @@ class LSP::Server
           @shutdown = true
           reply(request: request_message, result: nil)
         elsif controller.responds_to? :on_request
+          # Delegate to the controller in a separate thread to prevent blocking this loop.
           Async.spawn_on_different_thread(thread) do
             result = controller.on_request(request_message)
             reply(request: request_message, result: result)
@@ -156,12 +184,14 @@ class LSP::Server
         end
       elsif message.is_a? LSP::NotificationMessage
         if controller.responds_to? :on_notification
+          # Delegate to the controller.
           controller.on_notification(message.as(LSP::NotificationMessage))
         end
       elsif message.is_a? LSP::ResponseMessage
         response_message = message.as(LSP::ResponseMessage)
         original_message = requests_sent.delete(response_message.id)
         if controller.responds_to? :on_response
+          # Delegate to the controller in a separate thread to prevent blocking this loop.
           Async.spawn_on_different_thread(thread) do
             controller.on_response(response_message, original_message.try &.as(RequestMessage))
           rescue e
@@ -170,6 +200,8 @@ class LSP::Server
         end
       end
     rescue IO::Error
+      # Break on IO error because the connection is certainly closed.
+      # In this case, just terminate the loop.
       break
     rescue e
       on_exception(message, e)
@@ -179,10 +211,11 @@ class LSP::Server
   def start(controller)
     Log.debug { "Crystalline LSP server is initializing…" }
 
-    initialize_routine(controller)
+    handshake(controller)
 
     if controller.responds_to? :when_ready
       begin
+        # Give the chance to the controller to perform blocking initialization tasks before running the loop.
         controller.when_ready
       rescue e
         Log.warn(exception: e) { "Error during initialization: #{e}" }
@@ -191,6 +224,6 @@ class LSP::Server
 
     Log.info { "Crystalline LSP server is ready." }
 
-    message_loop(controller)
+    server_loop(controller)
   end
 end
