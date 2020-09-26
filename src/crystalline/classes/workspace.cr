@@ -192,26 +192,48 @@ class Crystalline::Workspace
     end
   end
 
+  # Format a method definition or macro.
   private def format_def(d : Crystal::Def | Crystal::Macro, *, short = false)
-    arguments = d.args.map &.to_s
-    if block_arg = d.block_arg
-      arguments << block_arg.to_s
-    elsif d.is_a? Crystal::Def && d.yields
-      arguments << "&block"
-    end
+    String.build { |str|
+      unless short
+        str << d.visibility.to_s.downcase
+        str << ' '
+      end
 
-    # TODO: Find out how to get the return type of the body.
-    # LSP::Log.info { "return type: #{d.return_type if d.responds_to? :return_type}" }
-    # LSP::Log.info { "type: #{d.type?}" }
-    # LSP::Log.info { "body class: #{d.body.class}" }
-    # LSP::Log.info { "body type: #{d.body.type?}" }
-    return_type = ": #{d.return_type}" if d.responds_to?(:return_type) && !d.return_type.nil?
+      str << d.name
+      str << ' '
 
-    if short
-      "#{d.name} (#{arguments.join ", "})#{return_type}"
-    else
-      "#{d.visibility.to_s.downcase} #{d.name}(#{arguments.join ", "})#{return_type}"
+      if d.args.size > 0 || d.block_arg || d.double_splat
+        str << '('
+        printed_arg = false
+        d.args.each_with_index do |arg, i|
+          str << ", " if printed_arg
+          str << '*' if d.splat_index == i
+          str << arg.to_s
+          printed_arg = true
+        end
+        if double_splat = d.double_splat
+          str << ", " if printed_arg
+          str << "**"
+          str << double_splat
+          printed_arg = true
+        end
+        if d.block_arg
+          str << ", " if printed_arg
+          str << '&'
+          printed_arg = true
     end
+        str << ')'
+      end
+      if d.responds_to?(:return_type) && (return_type = d.return_type)
+        str << " : #{return_type}"
+      end
+
+      if d.responds_to?(:free_vars) && (free_vars = d.free_vars)
+        str << " forall "
+        free_vars.join(str, ", ")
+      end
+    }
   rescue e
     # LSP::Log.error(exception: e) { e.to_s }
     d.to_s
