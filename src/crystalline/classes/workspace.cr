@@ -68,6 +68,8 @@ class Crystalline::Workspace
   def save_document(server : LSP::Server, params : LSP::DidSaveTextDocumentParams)
     file_uri = params.text_document.uri
     @result_cache.invalidate(file_uri)
+    # spawn is needed because we are inside a lock
+    # and compilation should not prevent unlocking the mutex
     spawn self.compile(server, URI.parse file_uri)
   end
 
