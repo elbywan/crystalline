@@ -5,6 +5,7 @@ require "./submodule_visitor"
 require "./concrete_semantic_visitor"
 
 module Crystalline::Analysis
+  # Compile a target *file_uri*.
   def self.compile(server : LSP::Server, file_uri : URI, *, file_overrides : Hash(String, String)? = nil, ignore_diagnostics = false, wants_doc = false, permissive = false, top_level = false)
     if file_uri.scheme == "file"
       file = File.new file_uri.decoded_path
@@ -16,8 +17,15 @@ module Crystalline::Analysis
     end
   end
 
+  # Compile an array of *sources*.
   def self.compile(server : LSP::Server, sources : Array(Crystal::Compiler::Source), *, file_overrides : Hash(String, String)? = nil, ignore_diagnostics = false, wants_doc = false, permissive = false, top_level = false)
     diagnostics = Diagnostics.new
+    reply_channel = Channel(Crystal::Compiler::Result | Exception).new
+
+    # Delegate heavy processing to a separate thread.
+    Thread.new do
+      kill_thread = Channel(Nil).new
+      spawn same_thread: true do
     compiler = Crystal::Compiler.new
     compiler.no_codegen = true
     compiler.color = false
@@ -26,13 +34,27 @@ module Crystalline::Analysis
     compiler.wants_doc = wants_doc
     result = begin
       if top_level
+            # Top level only.
         compiler.top_level_semantic(sources)
       elsif permissive
+            # Permissive means that if an error is thrown during the semantic phase, we still get a partially typed AST back.
         compiler.permissive_compile(sources, "")
       else
+            # Regular parser + semantic analysis phases.
         compiler.compile(sources, "")
       end
     end
+        reply_channel.send(result)
+      rescue e : Exception
+        reply_channel.send(e)
+      ensure
+        kill_thread.send nil
+      end
+      kill_thread.receive
+    end
+    result = reply_channel.receive
+
+    raise result if result.is_a? Exception
     unless ignore_diagnostics
       result.program.requires.each { |path|
         diagnostics.init_value("file://#{path}")
@@ -46,7 +68,7 @@ module Crystalline::Analysis
     else
       LSP::Log.debug(exception: e) { "#{e}\n#{e.backtrace?}" }
     end
-    result
+    nil
   ensure
     diagnostics.try &.publish(server) unless ignore_diagnostics
   end

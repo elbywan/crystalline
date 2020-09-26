@@ -64,8 +64,7 @@ class LSP::Server
 
   # Reply to a *request* initiated by the client with the provided *result*.
   def reply(request : LSP::RequestMessage, *, result : T, do_not_log = false) forall T
-    request.id = @max_request_id.add(1)
-    response_message = LSP::ResponseMessage(T).new({id: request.id, result: result})
+    response_message = LSP::ResponseMessage(T).new({id: request.id || @max_request_id.add(1), result: result})
     send(message: response_message, do_not_log: do_not_log)
   end
 
@@ -167,37 +166,16 @@ class LSP::Server
       exit(0) if message.is_a? LSP::ExitNotification
 
       if message.is_a? LSP::RequestMessage
-        request_message = message.as(LSP::RequestMessage)
         if message.is_a? LSP::ShutdownRequest
           @shutdown = true
-          reply(request: request_message, result: nil)
-        elsif controller.responds_to? :on_request
-          # Delegate to the controller in a separate thread to prevent blocking this loop.
-          Async.spawn_on_different_thread(thread) do
-            result = controller.on_request(request_message)
-            reply(request: request_message, result: result)
-          rescue e
-            on_exception(message, e)
-          end
+          reply(request: message, result: nil)
         else
-          reply(request: request_message, result: nil)
+          delegate(controller, message)
         end
       elsif message.is_a? LSP::NotificationMessage
-        if controller.responds_to? :on_notification
-          # Delegate to the controller.
-          controller.on_notification(message.as(LSP::NotificationMessage))
-        end
+        delegate(controller, message)
       elsif message.is_a? LSP::ResponseMessage
-        response_message = message.as(LSP::ResponseMessage)
-        original_message = requests_sent.delete(response_message.id)
-        if controller.responds_to? :on_response
-          # Delegate to the controller in a separate thread to prevent blocking this loop.
-          Async.spawn_on_different_thread(thread) do
-            controller.on_response(response_message, original_message.try &.as(RequestMessage))
-          rescue e
-            on_exception(message, e)
-          end
-        end
+        delegate(controller, message)
       end
     rescue IO::Error
       # Break on IO error because the connection is certainly closed.
@@ -205,6 +183,40 @@ class LSP::Server
       break
     rescue e
       on_exception(message, e)
+    end
+  end
+
+  private def delegate(controller, message : LSP::RequestMessage)
+    if controller.responds_to? :on_request
+      spawn same_thread: false do
+        result = controller.on_request(message)
+        reply(request: message, result: result)
+      rescue e
+        on_exception(message, e)
+      end
+    else
+      reply(request: message.as(LSP::RequestMessage), result: nil)
+    end
+  end
+
+  private def delegate(controller, message : LSP::NotificationMessage)
+    if controller.responds_to? :on_notification
+      spawn same_thread: false do
+        controller.on_notification(message)
+      rescue e
+        on_exception(message, e)
+      end
+    end
+  end
+
+  private def delegate(controller, message : LSP::ResponseMessage)
+    if controller.responds_to? :on_response
+      spawn same_thread: false do
+        original_message = requests_sent.delete(message.id)
+        controller.on_response(message, original_message.try &.as(RequestMessage))
+      rescue e
+        on_exception(message, e)
+      end
     end
   end
 

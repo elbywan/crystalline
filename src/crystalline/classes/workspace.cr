@@ -50,9 +50,7 @@ class Crystalline::Workspace
     entry_point?.try { |entry|
       @result_cache.invalidate(entry.to_s)
     } if inside_workspace?(URI.parse file_uri)
-    # Async.spawn_on_different_thread(server.thread) {
-    #   self.compile(server, URI.parse(file_uri), in_memory: true )
-    # }
+    # spawn self.compile(server, URI.parse(file_uri), in_memory: true )
   end
 
   def close_document(params : LSP::DidCloseTextDocumentParams)
@@ -62,13 +60,15 @@ class Crystalline::Workspace
   def save_document(server : LSP::Server, params : LSP::DidSaveTextDocumentParams)
     file_uri = params.text_document.uri
     @result_cache.invalidate(file_uri)
-    Async.spawn_on_different_thread(server.thread) { self.compile(server, URI.parse file_uri) }
+    spawn self.compile(server, URI.parse file_uri)
   end
 
   def format_document(params : LSP::DocumentFormattingParams) : {String, TextDocument}?
     @opened_documents[params.text_document.uri]?.try { |document|
       {Crystal.format(document.contents), document}
     }
+  rescue e
+    # swallow exceptions silently
   end
 
   def format_document(params : LSP::DocumentRangeFormattingParams) : {String, TextDocument}?
@@ -79,12 +79,15 @@ class Crystalline::Workspace
       contents_lines[0] = contents_lines.first[range.start.character...]
       {Crystal.format(contents_lines.join), document}
     }
+  rescue e
+    # swallow exceptions silently
   end
 
   private def inside_workspace?(file_uri : URI)
     entry_point? && dependencies.size > 0 && file_uri.decoded_path.in?(dependencies)
   end
 
+  # Run a top level semantic analysis to compute dependencies.
   def recalculate_dependencies(server)
     return unless target = entry_point?
 
@@ -96,13 +99,20 @@ class Crystalline::Workspace
     nil
   end
 
-  @@compilation_lock = Mutex.new
+  # Allow one compilation at a time.
+  class_getter compilation_lock = Mutex.new
+
+  # Use the crystal compiler to typecheck the program.
   def compile(server : LSP::Server, file_uri : URI? = nil, *, in_memory = false, ignore_diagnostics = false, wants_doc = false, text_overrides = nil, permissive = false, top_level = false)
+    # We need a target.
     return nil unless file_uri || entry_point?
 
+    # If the workspace entry point has less than 1 dependency, it could mean that the last dependency calculation failed (likely because of a syntax error).
+    # So we try again.
     recalculate_dependencies(server) if dependencies.size < 2
 
     if external_file = file_uri.try { |uri| !inside_workspace?(uri) }
+      # If the file is not a workspace dependency.
       target = file_uri.not_nil!
       progress = Progress.new(
         token: "workspace/compile",
@@ -110,6 +120,7 @@ class Crystalline::Workspace
         message: target.decoded_path
       )
     else
+      # File is a dependency.
       target = entry_point?.not_nil!
       progress = Progress.new(
         token: "workspace/compile",
@@ -119,11 +130,14 @@ class Crystalline::Workspace
     end
 
     target_string = target.to_s
+    # Check we can serve the result from the cache.
     if @result_cache.exists?(target_string) && !@result_cache.invalidated?(target_string)
       return @result_cache.get(target_string)
     end
 
+    # Wait for pending compilations to finish…
     @@compilation_lock.synchronize do
+      # Check again the cache in case some previous compilation that ran while waiting for the mutex to unlock is still valid.
       if @result_cache.exists?(target_string) && !@result_cache.invalidated?(target_string)
         return @result_cache.get(target_string)
       end
@@ -133,12 +147,15 @@ class Crystalline::Workspace
       progress.report(server) do
         file_overrides = nil
         sources = nil
+        # Store the start of the compilation.
         compilation_start = @result_cache.monotonic_now
         if in_memory
+          # Tell the compiler to load the opened files from memory, not from the filesystem.
           file_overrides = Hash(String, String).new
           @opened_documents.each { |uri_str, text_document|
             contents = text_overrides.try(&.[uri_str]?) || text_document.contents
             if target_string == uri_str
+              # If the entry point itself needs to be loaded from memory.
               sources = [
                 Crystal::Compiler::Source.new(target.decoded_path, contents),
               ]
@@ -148,10 +165,14 @@ class Crystalline::Workspace
           }
         end
         result = Analysis.compile(server, sources || target, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, permissive: permissive, top_level: top_level)
+        # Store the result in the cache, unless a client event invalided the previous cache.
+        # For instance if a compilation is running, but the user saved the document in the meantime (before completion)
+        # then we discard the result because it is already outdated.
         @result_cache.set(target_string, result, unless_invalidated_since: compilation_start)
 
         if result
           unless external_file
+            # Store the workspace dependencies.
             @dependencies = result.program.requires
           end
           "Completed successfully."
