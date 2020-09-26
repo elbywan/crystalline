@@ -26,24 +26,24 @@ module Crystalline::Analysis
     Thread.new do
       kill_thread = Channel(Nil).new
       spawn same_thread: true do
-    compiler = Crystal::Compiler.new
-    compiler.no_codegen = true
-    compiler.color = false
-    compiler.no_cleanup = true
-    compiler.file_overrides = file_overrides
-    compiler.wants_doc = wants_doc
-    result = begin
-      if top_level
+        compiler = Crystal::Compiler.new
+        compiler.no_codegen = true
+        compiler.color = false
+        compiler.no_cleanup = true
+        compiler.file_overrides = file_overrides
+        compiler.wants_doc = wants_doc
+        result = begin
+          if top_level
             # Top level only.
-        compiler.top_level_semantic(sources)
-      elsif permissive
+            compiler.top_level_semantic(sources)
+          elsif permissive
             # Permissive means that if an error is thrown during the semantic phase, we still get a partially typed AST back.
-        compiler.permissive_compile(sources, "")
-      else
+            compiler.permissive_compile(sources, "")
+          else
             # Regular parser + semantic analysis phases.
-        compiler.compile(sources, "")
-      end
-    end
+            compiler.compile(sources, "")
+          end
+        end
         reply_channel.send(result)
       rescue e : Exception
         reply_channel.send(e)
@@ -70,20 +70,24 @@ module Crystalline::Analysis
     end
     nil
   ensure
+    # Propagate diagnostics to the client.
     diagnostics.try &.publish(server) unless ignore_diagnostics
   end
 
+  # Return the node at the given *location*.
   def self.node_at_cursor(result : Crystal::Compiler::Result, location : Crystal::Location) : Crystal::ASTNode?
     nodes, _ = CursorVisitor.new(location).process(result)
     nodes.last?
   end
 
+  # Return the whole hierarchy of nodes at the given *location*.
   def self.nodes_at_cursor(result : Crystal::Compiler::Result, location : Crystal::Location) : {Array(Crystal::ASTNode), Hash(String, {Crystal::Type?, Crystal::Location?})}
     CursorVisitor.new(location).process(result)
   end
 
   record Definitions, node : Crystal::ASTNode, locations : Array({Crystal::Location, Crystal::Location})?
 
+  # Return the possible definition for the node at the given *location*.
   def self.definitions_at_cursor(result : Crystal::Compiler::Result, location : Crystal::Location) : Definitions?
     nodes, context = CursorVisitor.new(location).process(result)
     nodes.last?.try { |node|
@@ -152,22 +156,10 @@ module Crystalline::Analysis
 
   def self.all_defs(type, *, accumulator = [] of {String, Crystal::Def, Crystal::Type, Int32}, nesting = 0)
     if type.is_a? Crystal::UnionType
-      # intersected_defs = Set(Crystal::Def).new
+      # TODO: intersection instead of union
       type.union_types.each { |t|
         all_defs(t, accumulator: accumulator, nesting: nesting)
-      # acc = [] of { String, Crystal::Def, Crystal::Type, Int32 }
-      # all_defs(t, accumulator: acc, nesting: nesting)
-      # defs = Set(Crystal::Def).new(acc.map &.[1])
-      # if intersected_defs.empty?
-      #   intersected_defs = defs
-      # else
-      #   intersected_defs = intersected_defs & defs
-      # end
-      # accumulator += acc
       }
-      # return accumulator.select { |elt|
-      #   intersected_defs.includes? elt[1]
-      # }.uniq &.[1]
       return accumulator.uniq &.[1]
     end
 

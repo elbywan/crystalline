@@ -7,6 +7,7 @@ require "version_from_shard"
 module Crystalline
   VersionFromShard.declare(__DIR__)
 
+  # Supported server capabilities.
   SERVER_CAPABILITIES = LSP::ServerCapabilities.new({
     text_document_sync:                 LSP::TextDocumentSyncKind::Incremental,
     document_formatting_provider:       true,
@@ -22,6 +23,7 @@ module Crystalline
   })
 
   module EnvironmentConfig
+    # Add the `crystal env` environment variables to the current env.
     def self.run
       initialize_from_crystal_env.each do |k, v|
         ENV[k] = v

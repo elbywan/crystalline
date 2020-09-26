@@ -1,4 +1,5 @@
 struct Enum
+  # An JSON fiendly string enum.
   macro string(name, *, downcase = true, mappings = nil, &block)
     enum {{ name.id }}
       {{ block.body }}

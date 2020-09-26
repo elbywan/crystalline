@@ -2,6 +2,7 @@ require "compiler/crystal/**"
 
 module Crystal
   class Compiler
+    # Make it possible to compile in-memory.
     property file_overrides : Hash(String, String)? = nil
 
     private def new_program(sources)
@@ -12,10 +13,12 @@ module Crystal
   end
 
   class Program < NonGenericModuleType
+    # Make it possible to compile in-memory.
     property file_overrides : Hash(String, String)? = nil
   end
 
   class SemanticVisitor < Visitor
+    # Make it possible to compile in-memory.
     def visit(node : Require)
       if expanded = node.expanded
         expanded.accept self
@@ -38,6 +41,7 @@ module Crystal
         nodes = Array(ASTNode).new(filenames.size)
         filenames.each do |filename|
           if @program.requires.add?(filename)
+            # Use file_overrides is needed to load files from memory.
             file_contents = @program.file_overrides.try(&.[filename]?) || File.read(filename)
             parser = Parser.new file_contents, @program.string_pool
             parser.filename = filename
@@ -85,6 +89,7 @@ module Crystal
 end
 
 class Crystal::Compiler
+  # Will not raise if the semantic analysis fails.
   def permissive_compile(source : Source | Array(Source), output_filename : String) : Result
     source = [source] unless source.is_a?(Array)
     program = new_program(source)
@@ -95,6 +100,7 @@ class Crystal::Compiler
 end
 
 class Crystal::Program
+  # Will not raise if the semantic analysis fails.
   def permissive_semantic(node : ASTNode, cleanup = true) : ASTNode
     node, processor = top_level_semantic(node)
 
@@ -128,6 +134,7 @@ class Crystal::Program
 
       result
     rescue
+      # Returns a partially typed ast.
       node
     end
   end

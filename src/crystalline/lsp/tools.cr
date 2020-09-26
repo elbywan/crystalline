@@ -29,21 +29,4 @@ module LSP
       {% end %}
     end
   end
-
-  module Async
-    def self.spawn_on_different_thread(thread : Thread, &block : ->) : Nil
-      block # prevents a compiler error
-      {% if flag?(:preview_mt) %}
-        spawn same_thread: false do
-          if Thread.current == thread
-            spawn_on_different_thread(thread, &block)
-          else
-            block.call
-          end
-        end
-      {% else %}
-        spawn(&block)
-      {% end %}
-    end
-  end
 end

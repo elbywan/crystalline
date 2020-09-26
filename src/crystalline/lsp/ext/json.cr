@@ -1,4 +1,5 @@
 module JSON::Serializable
+  # This extension adds a default type to deserialize the json into, in case the discriminator value is not covered by the mappings.
   macro json_discriminator(field, mapping, *, default = nil)
     {% unless mapping.is_a?(HashLiteral) || mapping.is_a?(NamedTupleLiteral) %}
       {% mapping.raise "mapping argument must be a HashLiteral or a NamedTupleLiteral, not #{mapping.class_name.id}" %}

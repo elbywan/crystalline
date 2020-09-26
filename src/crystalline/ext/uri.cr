@@ -1,3 +1,4 @@
+# This extension adds a way to cache the decoded path.
 class URI
   @decoded_path : String? = nil
 

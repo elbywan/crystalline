@@ -6,10 +6,15 @@ require "./progress"
 require "./result_cache"
 
 class Crystalline::Workspace
+  # The previous compilation results, indexed by compilation entry point.
   @result_cache : Crystalline::ResultCache = Crystalline::ResultCache.new
+  # The workspace filesystem uri.
   getter root_uri : URI?
+  # A list of documents that are openened in the text editor.
   getter opened_documents = {} of String => TextDocument
+  # The dependencies of the workspace, meaning the list of files required by the compilation target (entry point).
   getter dependencies : Set(String) = Set(String).new
+  # Determines the workspace entry point.
   getter? entry_point : URI do
     root_uri.try { |uri|
       path = Path[uri.decoded_path, "shard.yml"]
@@ -17,10 +22,13 @@ class Crystalline::Workspace
         YAML.parse(file)
       end
       shard_name = shards_yaml["name"].as_s
+      # If shard.yml has the `crystalline/main` key, use that.
       relative_main = shards_yaml.dig?("crystalline", "main").try &.as_s
+      # Else if shard.yml has a `targets/[shard name]/main` key, use that.
       relative_main ||= shards_yaml.dig?("targets", shard_name, "main").try &.as_s
       if relative_main && File.exists? relative_main
         main_path = Path[uri.decoded_path, relative_main]
+        # Add the entry point as a dependency to itself.
         dependencies << main_path.to_s
         URI.parse("file://#{main_path}")
       end
@@ -186,6 +194,7 @@ class Crystalline::Workspace
       select
       when result = sync_channel.receive
         result
+      # Just in case…
       when timeout 60.seconds
         nil
       end
@@ -222,7 +231,7 @@ class Crystalline::Workspace
           str << ", " if printed_arg
           str << '&'
           printed_arg = true
-    end
+        end
         str << ')'
       end
       if d.responds_to?(:return_type) && (return_type = d.return_type)
@@ -269,7 +278,7 @@ class Crystalline::Workspace
     )
     result.try { |r|
       Analysis.nodes_at_cursor(r, location)
-    }.try do |nodes, context|
+    }.try do |nodes, _context|
       n = nodes.last?
       contents = [] of String
 
@@ -278,7 +287,7 @@ class Crystalline::Workspace
       # LSP::Log.info { "Node type: #{n.try &.type?}" }
       # LSP::Log.info { "Node type class: #{n.try &.type?.try &.class}" }
       # LSP::Log.info { "Nodes classes: #{nodes.map &.class}"}
-      # LSP::Log.info { "Context: #{context}" }
+      # LSP::Log.info { "Context: #{_context}" }
 
       if n.is_a? Crystal::Def || n.is_a? Crystal::Macro
         contents << code_markdown(format_def(n), language: "crystal")
@@ -392,9 +401,12 @@ class Crystalline::Workspace
     truncate_line = false
 
     if trigger_character
+      # Autocompletion triggered by a special character (. and :)
+      # We need to strip every occurence of the special character to please the parser.
       prefix = document_lines[position.line][0...position.character].rstrip(trigger_character)
       left_offset = position.character - prefix.size
     else
+      # We need to determine which character (and by extension - autocompletion kind) is best suited depending on the location and its surroundings.
       document_lines[position.line][0...position.character].each_char_with_index { |char, index|
         unless char.ascii_alphanumeric? || char == '_' || char == '?' || char == '!'
           trigger_character = char.to_s
@@ -406,6 +418,7 @@ class Crystalline::Workspace
 
     suffix = document_lines[position.line][(position.character)..]?
 
+    # Remove the rest of the line (or part of it) to please the parser.
     suffix.try &.each_char_with_index { |char, index|
       unless char.ascii_alphanumeric? || char == '_' || char == '?' || char == '!' || char == ':'
         truncate_line = true if char == '(' || char == '{' || char == '['
@@ -420,6 +433,7 @@ class Crystalline::Workspace
     # LSP::Log.info { "trigger character: #{trigger_character}"}
 
     document_lines[position.line] = prefix + (!truncate_line ? (suffix || "\n") : "\n")
+    # Force the compiler load the file from this Hash.
     text_overrides = {
       file_uri.to_s => document_lines.join,
     }
@@ -433,6 +447,7 @@ class Crystalline::Workspace
     # Temporary until on the fly context completion can be handled
     return unless trigger_character == "." || trigger_character == ":"
 
+    # Trigger a "permissive" compilation.
     result = self.compile(server, file_uri, in_memory: true, ignore_diagnostics: false, wants_doc: true, text_overrides: text_overrides, permissive: true)
     return unless result
 
@@ -453,6 +468,7 @@ class Crystalline::Workspace
 
       case trigger_character
       when "."
+        # We are looking for methods…
         if n.type?.responds_to? :defs
           Analysis.all_defs(n.type).each { |def_name, definition, owner_type, nesting|
             owner_prefix = "*Inherited from: #{owner_type.name}*\n\n" if owner_type.responds_to? :name && owner_type != n.type
@@ -509,6 +525,7 @@ class Crystalline::Workspace
           }
         end
       when ":"
+        # We are looking for module types…
         node_type = n.type?
 
         if n.is_a? Crystal::Path
@@ -567,7 +584,7 @@ class Crystalline::Workspace
       completion_items.each_with_index do |elt, i|
         sort_text = elt.sort_text || elt.label
         selected_element_index ||= i
-        target = completion_items[selected_element_index].try { |elt| elt.sort_text || elt.label }
+        target = completion_items[selected_element_index].try { |e| e.sort_text || e.label }
         if (sort_text <=> target) < 0
           selected_element_index = i
         end
