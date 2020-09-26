@@ -5,6 +5,43 @@ require "./submodule_visitor"
 require "./concrete_semantic_visitor"
 
 module Crystalline::Analysis
+  alias CompilationTask = {sources: Array(Crystal::Compiler::Source), file_overrides: Hash(String, String)?, wants_doc: Bool, permissive: Bool, top_level: Bool, reply_channel: Channel(Crystal::Compiler::Result | Exception)}
+
+  @@compilation_task = Channel(CompilationTask).new
+  # Start a dedicated compilation thread.
+  @@compilation_thread = Thread.new do
+    kill_thread = Channel(Nil).new
+    spawn same_thread: true do
+      loop do
+        task = @@compilation_task.receive
+        sources = task["sources"]
+        compiler = Crystal::Compiler.new
+        compiler.no_codegen = true
+        compiler.color = false
+        compiler.no_cleanup = true
+        compiler.file_overrides = task["file_overrides"]
+        compiler.wants_doc = task["wants_doc"]
+        result = begin
+          if task["top_level"]
+            # Top level only.
+            compiler.top_level_semantic(sources)
+          elsif task["permissive"]
+            # Permissive means that if an error is thrown during the semantic phase, we still get a partially typed AST back.
+            compiler.permissive_compile(sources, "")
+          else
+            # Regular parser + semantic analysis phases.
+            compiler.compile(sources, "")
+          end
+        end
+        task["reply_channel"].send(result)
+      rescue e : Exception
+        task.try &.["reply_channel"].send(e)
+      end
+      kill_thread.send nil
+    end
+    kill_thread.receive
+  end
+
   # Compile a target *file_uri*.
   def self.compile(server : LSP::Server, file_uri : URI, *, file_overrides : Hash(String, String)? = nil, ignore_diagnostics = false, wants_doc = false, permissive = false, top_level = false)
     if file_uri.scheme == "file"
@@ -23,35 +60,15 @@ module Crystalline::Analysis
     reply_channel = Channel(Crystal::Compiler::Result | Exception).new
 
     # Delegate heavy processing to a separate thread.
-    Thread.new do
-      kill_thread = Channel(Nil).new
-      spawn same_thread: true do
-        compiler = Crystal::Compiler.new
-        compiler.no_codegen = true
-        compiler.color = false
-        compiler.no_cleanup = true
-        compiler.file_overrides = file_overrides
-        compiler.wants_doc = wants_doc
-        result = begin
-          if top_level
-            # Top level only.
-            compiler.top_level_semantic(sources)
-          elsif permissive
-            # Permissive means that if an error is thrown during the semantic phase, we still get a partially typed AST back.
-            compiler.permissive_compile(sources, "")
-          else
-            # Regular parser + semantic analysis phases.
-            compiler.compile(sources, "")
-          end
-        end
-        reply_channel.send(result)
-      rescue e : Exception
-        reply_channel.send(e)
-      ensure
-        kill_thread.send nil
-      end
-      kill_thread.receive
-    end
+    @@compilation_task.send({
+      sources:        sources,
+      file_overrides: file_overrides,
+      wants_doc:      wants_doc,
+      permissive:     permissive,
+      top_level:      top_level,
+      reply_channel:  reply_channel,
+    })
+
     result = reply_channel.receive
 
     raise result if result.is_a? Exception

@@ -23,6 +23,7 @@ class Crystalline::TextDocument
 
   def update_contents(contents : String, range : LSP::Range? = nil)
     if range
+      # Incremental update.
       prefix = @inner_contents[range.start.line]?.try &.[...range.start.character].chomp || ""
       suffix = @inner_contents[range.end.line]?.try &.[range.end.character..]? || @inner_contents[range.end.line]? || ""
       replacement_lines = String.build { |str|
@@ -30,6 +31,7 @@ class Crystalline::TextDocument
       }.lines(chomp: false)
       @inner_contents = (@inner_contents[...range.start.line]? || [] of String) + replacement_lines + (@inner_contents[range.end.line + 1...]? || [] of String)
     else
+      # Full update.
       self.contents = contents
     end
   end
