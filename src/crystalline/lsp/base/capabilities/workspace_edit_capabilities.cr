@@ -39,7 +39,6 @@ module LSP
     # The resource operations the client supports. Clients should at least
     # support 'create', 'rename' and 'delete' files and folders.
     @[JSON::Field(key: "resourceOperations")]
-
     property resource_operations : Array(ResourceOperationKind)?
 
     # The failure handling strategy of a client if applying the workspace edit

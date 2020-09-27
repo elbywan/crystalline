@@ -165,16 +165,10 @@ class LSP::Server
       raise LSP::Exception.new(code: :invalid_request, message: "Server is shutting down.") if @shutdown
       exit(0) if message.is_a? LSP::ExitNotification
 
-      if message.is_a? LSP::RequestMessage
-        if message.is_a? LSP::ShutdownRequest
-          @shutdown = true
-          reply(request: message, result: nil)
-        else
-          delegate(controller, message)
-        end
-      elsif message.is_a? LSP::NotificationMessage
-        delegate(controller, message)
-      elsif message.is_a? LSP::ResponseMessage
+      if message.is_a? LSP::ShutdownRequest
+        @shutdown = true
+        reply(request: message, result: nil)
+      else
         delegate(controller, message)
       end
     rescue IO::Error
@@ -188,7 +182,7 @@ class LSP::Server
 
   private def delegate(controller, message : LSP::RequestMessage)
     if controller.responds_to? :on_request
-      spawn same_thread: false do
+      spawn do
         result = controller.on_request(message)
         reply(request: message, result: result)
       rescue e
@@ -201,7 +195,7 @@ class LSP::Server
 
   private def delegate(controller, message : LSP::NotificationMessage)
     if controller.responds_to? :on_notification
-      spawn same_thread: false do
+      spawn do
         controller.on_notification(message)
       rescue e
         on_exception(message, e)
@@ -211,7 +205,7 @@ class LSP::Server
 
   private def delegate(controller, message : LSP::ResponseMessage)
     if controller.responds_to? :on_response
-      spawn same_thread: false do
+      spawn do
         original_message = requests_sent.delete(message.id)
         controller.on_response(message, original_message.try &.as(RequestMessage))
       rescue e
