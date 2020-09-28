@@ -559,7 +559,11 @@ class Crystalline::Workspace
         end
       else
         # Context autocompletion.
-        Analysis.context_at(result, location).try &.each { |name, type|
+        context = Analysis.context_at(result, location)
+        if trigger_character == "@"
+          context.try &.select! { |name| name.starts_with? "@" }
+        end
+        context.try &.each { |name, type|
           label = "#{name} : #{type}"
           text_edit = LSP::TextEdit.new({
             range:    range,

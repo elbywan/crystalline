@@ -13,7 +13,7 @@ module Crystalline
     document_formatting_provider:       true,
     document_range_formatting_provider: true,
     completion_provider:                LSP::CompletionOptions.new({
-      trigger_characters: [".", ":"],
+      trigger_characters: [".", ":", "@"],
     }),
     hover_provider:      true,
     definition_provider: true,
