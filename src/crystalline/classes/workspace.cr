@@ -113,7 +113,7 @@ class Crystalline::Workspace
   class_getter compilation_lock = Mutex.new
 
   # Use the crystal compiler to typecheck the program.
-  def compile(server : LSP::Server, file_uri : URI? = nil, *, in_memory = false, ignore_diagnostics = false, wants_doc = false, text_overrides = nil, permissive = false, top_level = false)
+  def compile(server : LSP::Server, file_uri : URI? = nil, *, in_memory = false, ignore_diagnostics = false, wants_doc = false, text_overrides = nil, permissive = false, top_level = false, discard_nil_cached_result = false)
     # We need a target.
     return nil unless file_uri || entry_point?
 
@@ -142,14 +142,16 @@ class Crystalline::Workspace
     target_string = target.to_s
     # Check we can serve the result from the cache.
     if @result_cache.exists?(target_string) && !@result_cache.invalidated?(target_string)
-      return @result_cache.get(target_string)
+      cached_result = @result_cache.get(target_string)
+      return cached_result unless cached_result.nil? && discard_nil_cached_result
     end
 
     # Wait for pending compilations to finish…
     @@compilation_lock.synchronize do
       # Check again the cache in case some previous compilation that ran while waiting for the mutex to unlock is still valid.
       if @result_cache.exists?(target_string) && !@result_cache.invalidated?(target_string)
-        return @result_cache.get(target_string)
+        cached_result = @result_cache.get(target_string)
+        return cached_result unless cached_result.nil? && discard_nil_cached_result
       end
 
       sync_channel = Channel(Crystal::Compiler::Result?).new
@@ -447,7 +449,7 @@ class Crystalline::Workspace
     )
 
     # Trigger a "permissive" compilation.
-    result = self.compile(server, file_uri, in_memory: true, ignore_diagnostics: true, wants_doc: true, text_overrides: text_overrides, permissive: true)
+    result = self.compile(server, file_uri, in_memory: true, ignore_diagnostics: true, wants_doc: true, text_overrides: text_overrides, permissive: true, discard_nil_cached_result: true)
     return unless result
 
     nodes, _ = Analysis.nodes_at_cursor(result, location)
