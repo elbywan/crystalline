@@ -545,7 +545,7 @@ class Crystalline::Workspace
             completion_items << LSP::CompletionItem.new({
               label:         type_string,
               text_edit:     text_edit,
-              kind:          LSP::CompletionItemKind::Module,
+              kind:          Crystalline::Utils.map_completion_kind(type, default: LSP::CompletionItemKind::Module),
               documentation: type.doc.try { |doc|
                 LSP::MarkupContent.new({
                   kind:  LSP::MarkupKind::MarkDown,
