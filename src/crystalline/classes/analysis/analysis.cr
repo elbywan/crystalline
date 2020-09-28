@@ -55,11 +55,9 @@ module Crystalline::Analysis
     result = reply_channel.receive
 
     raise result if result.is_a? Exception
-    unless ignore_diagnostics
-      result.program.requires.each { |path|
-        diagnostics.init_value("file://#{path}")
-      }
-    end
+    result.program.requires.each { |path|
+      diagnostics.init_value("file://#{path}")
+    }
     result
   rescue e : Exception
     if e.is_a?(Crystal::TypeException) || e.is_a?(Crystal::SyntaxException)
