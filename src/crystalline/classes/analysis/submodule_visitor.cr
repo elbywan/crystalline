@@ -24,6 +24,8 @@ module Crystalline
     end
 
     private def process(type : Crystal::Type) : Nil
+      type.accept(self) if type.responds_to? :accept
+
       if type.is_a?(Crystal::Program) || type.is_a?(Crystal::FileModule)
         type.types?.try &.each_value do |inner_type|
           process inner_type
@@ -37,8 +39,6 @@ module Crystalline
       end
 
       process type.metaclass if type.metaclass != type
-
-      type.accept(self) if type.responds_to? :accept
     end
 
     def visit(node)
@@ -61,8 +61,8 @@ module Crystalline
     def visit(node : Crystal::ClassDef | Crystal::ModuleDef)
       if check_namespace(resolved_type = node.resolved_type)
         @submodules << resolved_type unless resolved_type == @target
-        true
       end
+      true
     end
   end
 end

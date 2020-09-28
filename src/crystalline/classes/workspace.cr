@@ -540,14 +540,14 @@ class Crystalline::Workspace
           Analysis.all_submodules(result, node_type).uniq(&.to_s).each { |type|
             type_string = type.to_s
 
-            # text_edit = LSP::TextEdit.new({
-            #   range:    range,
-            #   new_text: type_string.lchop(node_type.to_s),
-            # })
+            text_edit = LSP::TextEdit.new({
+              range:    range,
+              new_text: type_string.lchop(node_type.to_s).lchop(':'),
+            })
 
             completion_items << LSP::CompletionItem.new({
               label: type_string,
-              # text_edit:     text_edit,
+              text_edit:     text_edit,
               kind:          LSP::CompletionItemKind::Module,
               documentation: type.doc.try { |doc|
                 LSP::MarkupContent.new({
