@@ -148,3 +148,15 @@ struct Crystal::TypeDeclarationProcessor
     declare_meta_type_var(vars, owner, name, type, freeze_type: freeze_type, location: info.location)
   end
 end
+
+module Crystal
+  class ContextVisitor < Visitor
+    @visited_types = Set(Crystal::Type).new
+
+    private def process_type(type : Crystal::Type) : Nil
+      return if @visited_types.includes?(type)
+      @visited_types << type
+      super
+    end
+  end
+end

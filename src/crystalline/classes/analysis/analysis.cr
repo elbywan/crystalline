@@ -210,8 +210,8 @@ module Crystalline::Analysis
     SubModuleVisitor.new(module_type).process_result(result)
   end
 
-  def self.context_at(result : Crystal::Compiler::Result, location : Crystal::Location) : Array(Hash(String, Crystal::Type))?
-    Crystal::ContextVisitor.new(location).process(result).contexts.as(Array(Hash(String, Crystal::Type))?)
+  def self.context_at(result : Crystal::Compiler::Result, location : Crystal::Location) : Crystal::HashStringType?
+    Crystal::ContextVisitor.new(location).process(result).contexts.try &.last?
   end
 
   def self.resolve_path(path : Crystal::Path, ast_nodes : Array(Crystal::ASTNode))

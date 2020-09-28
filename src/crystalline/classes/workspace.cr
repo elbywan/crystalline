@@ -446,11 +446,8 @@ class Crystalline::Workspace
       column_number: position.character - left_offset
     )
 
-    # Temporary until on the fly context completion can be handled
-    return unless trigger_character == "." || trigger_character == ":"
-
     # Trigger a "permissive" compilation.
-    result = self.compile(server, file_uri, in_memory: true, ignore_diagnostics: false, wants_doc: true, text_overrides: text_overrides, permissive: true)
+    result = self.compile(server, file_uri, in_memory: true, ignore_diagnostics: true, wants_doc: true, text_overrides: text_overrides, permissive: true)
     return unless result
 
     nodes, _ = Analysis.nodes_at_cursor(result, location)
@@ -542,11 +539,11 @@ class Crystalline::Workspace
 
             text_edit = LSP::TextEdit.new({
               range:    range,
-              new_text: type_string.lchop(node_type.to_s).lchop(':'),
+              new_text: type_string.lchop(node_type.to_s).lchop(trigger_character || ':'),
             })
 
             completion_items << LSP::CompletionItem.new({
-              label: type_string,
+              label:         type_string,
               text_edit:     text_edit,
               kind:          LSP::CompletionItemKind::Module,
               documentation: type.doc.try { |doc|
@@ -559,27 +556,25 @@ class Crystalline::Workspace
           }
         end
       else
-        # Analysis.context_at(result, location).try &.each { |contexts|
-        #   contexts.each { |name, type|
-        #     label = "#{name} : #{type}"
-        #     LSP::Log.info { label }
-        #     text_edit = LSP::TextEdit.new({
-        #       range:    range,
-        #       new_text: label,
-        #     })
-        #     completion_items << LSP::CompletionItem.new({
-        #       label: label,
-        #       text_edit: text_edit,
-        #       kind: LSP::CompletionItemKind::Variable,
-        #       documentation: type.doc.try { |doc|
-        #         LSP::MarkupContent.new({
-        #           kind: LSP::MarkupKind::MarkDown,
-        #           value: doc
-        #         })
-        #       }
-        #     })
-        #   }
-        # }
+        # Context autocompletion.
+        Analysis.context_at(result, location).try &.each { |name, type|
+          label = "#{name} : #{type}"
+          text_edit = LSP::TextEdit.new({
+            range:    range,
+            new_text: name.lchop(trigger_character || ""),
+          })
+          completion_items << LSP::CompletionItem.new({
+            label:         label,
+            text_edit:     text_edit,
+            kind:          LSP::CompletionItemKind::Variable,
+            documentation: type.doc.try { |doc|
+              LSP::MarkupContent.new({
+                kind:  LSP::MarkupKind::MarkDown,
+                value: doc,
+              })
+            },
+          })
+        }
       end
 
       selected_element_index = nil
