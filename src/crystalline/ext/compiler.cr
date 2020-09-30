@@ -160,3 +160,9 @@ module Crystal
     end
   end
 end
+
+module Crystal
+  module ErrorFormat
+    getter filename
+  end
+end

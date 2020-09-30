@@ -18,25 +18,34 @@ class Crystalline::Diagnostics
     end
   end
 
-  def append_from_exception(error : Crystal::TypeException | Crystal::SyntaxException)
+  def append_from_exception(error : Crystal::ErrorFormat)
+    error_stack = Deque(Crystal::ErrorFormat).new
+
     loop do
-      if error.is_a? Crystal::ErrorFormat
-        self.append(LSP::Diagnostic.new(
-          line: error.line_number || 1,
-          column: error.column_number,
-          size: error.size || 0,
-          message: error.message || "Unknown error.",
-          source: error.true_filename
-        ))
-        if error.responds_to? :inner
-          break unless (error = error.inner)
-        else
-          break
-        end
+      error_stack.unshift error if error.is_a? Crystal::ErrorFormat
+      if error.responds_to? :inner
+        break unless (error = error.inner)
       else
         break
       end
     end
+
+    error_stack.each { |err|
+      if err.filename.is_a? Crystal::VirtualFile && (expanded_source = err.filename.as(Crystal::VirtualFile).expanded_location)
+        line = expanded_source.line_number || 1
+        column = expanded_source.column_number
+      else
+        line = err.line_number || 1
+        column = err.column_number
+      end
+      self.append(LSP::Diagnostic.new(
+        line: line,
+        column: column,
+        size: err.size || 0,
+        message: err.message || "Unknown error.",
+        source: err.true_filename
+      ))
+    }
   end
 
   def publish(server : LSP::Server)
