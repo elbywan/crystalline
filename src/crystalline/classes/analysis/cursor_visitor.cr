@@ -94,7 +94,12 @@ module Crystalline
       if contains_node
         @nodes << node
         @context = @scoped_vars.dup
-        true
+        if node.is_a? Crystal::Union
+          # Unions should not be visited.
+          false
+        else
+          true
+        end
       elsif @top_level && @nodes.empty?
         if node.is_a? Crystal::Require
           node.expanded.try &.accept(self)

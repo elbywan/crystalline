@@ -125,17 +125,9 @@ module Crystalline::Analysis
             {location, location}
           }
         elsif node.is_a? Crystal::Path
-          target = self.resolve_path(node, nodes)
-          # LSP::Log.info { "Path target: #{target} "} if target
-          # LSP::Log.info { "Path type: #{node.type?} "}
-          target.as?(Crystal::Const | Crystal::Type).try &.locations.try &.map do |location|
-            end_location = Crystal::Location.new(
-              location.filename,
-              line_number: location.line_number + 1,
-              column_number: 0
-            )
-            {location, end_location}
-          end
+          Utils.locations_from_path(node, nodes)
+        elsif node.is_a? Crystal::Union
+          Utils.locations_from_union(node, nodes)
         elsif node.is_a? Crystal::Var
           if definition = context[node.to_s]?
             _, location = definition
@@ -218,25 +210,5 @@ module Crystalline::Analysis
 
   def self.context_at(result : Crystal::Compiler::Result, location : Crystal::Location) : Crystal::HashStringType?
     Crystal::ContextVisitor.new(location).process(result).contexts.try &.last?
-  end
-
-  def self.resolve_path(path : Crystal::Path, ast_nodes : Array(Crystal::ASTNode))
-    resolved_path = path.type? || path.target_const || path.target_type || ast_nodes[..-2]?.try &.reverse_each.reduce(nil) do |_, elt|
-      if elt.responds_to? :resolved_type
-        typ = elt.resolved_type
-      end
-
-      typ ||= elt.type?
-
-      if p = (typ.try &.lookup_path(path))
-        break p
-      end
-    end
-
-    if resolved_path.is_a? Crystal::Type
-      resolved_path.instance_type
-    else
-      resolved_path
-    end
   end
 end

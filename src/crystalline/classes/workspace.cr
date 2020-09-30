@@ -315,7 +315,7 @@ class Crystalline::Workspace
         end
         append_markdown_doc contents, (definition || n.expanded_macro).try &.doc
       elsif n.is_a? Crystal::Path
-        node_type = n.type? || Analysis.resolve_path(n, nodes)
+        node_type = n.type? || Utils.resolve_path(n, nodes)
         if node_type
           contents << code_markdown(node_type.to_s, language: "crystal")
           append_markdown_doc contents, node_type.doc
@@ -534,7 +534,7 @@ class Crystalline::Workspace
         node_type = n.type?
 
         if n.is_a? Crystal::Path
-          node_type ||= Analysis.resolve_path(n, nodes)
+          node_type ||= Utils.resolve_path(n, nodes)
         end
 
         if node_type.is_a? Crystal::MetaclassType
