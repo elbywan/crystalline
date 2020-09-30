@@ -51,7 +51,7 @@ class Crystalline::Workspace
     file_uri = params.text_document.uri
     @opened_documents[file_uri]?.try { |document|
       content_changes = params.content_changes.map { |change|
-        { change.text, change.range }
+        {change.text, change.range}
       }
       document.update_contents(content_changes, version: params.text_document.version)
     }
@@ -459,7 +459,7 @@ class Crystalline::Workspace
 
       # LSP::Log.info { "Node at cursor: #{n}" }
       # LSP::Log.info { "Node class: #{n.class}" }
-      # # LSP::Log.info { "Node type: #{n.type?}" }
+      # LSP::Log.info { "Node type: #{n.type?}" }
       # LSP::Log.info { "Node type class: #{n.type?.try &.class}" }
       # LSP::Log.info { "Node type defs: #{n.type?.try &.defs}" }
 
