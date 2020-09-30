@@ -470,9 +470,12 @@ class Crystalline::Workspace
 
       case trigger_character
       when "."
+        node_type = n.type?
+        node_type = node_type.base_type if node_type.responds_to? :base_type
+
         # We are looking for methods…
-        if n.type?.responds_to? :defs
-          Analysis.all_defs(n.type).each { |def_name, definition, owner_type, nesting|
+        if node_type.responds_to? :defs
+          Analysis.all_defs(node_type.not_nil!).each { |def_name, definition, owner_type, nesting|
             owner_prefix = "*Inherited from: #{owner_type.name}*\n\n" if owner_type.responds_to? :name && owner_type != n.type
             owner_prefix ||= ""
             documentation = (owner_prefix + (definition.doc || ""))
