@@ -13,6 +13,8 @@ targets:
 dependencies:
   version_from_shard:
     github: hugopl/version_from_shard
+  priority-queue:
+    github: spider-gazelle/priority-queue
 
 development_dependencies:
   sentry:

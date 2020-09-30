@@ -51,7 +51,7 @@ class Crystalline::Workspace
     file_uri = params.text_document.uri
     @opened_documents[file_uri]?.try { |document|
       params.content_changes.each { |change|
-        document.update_contents(change.text, change.range)
+        document.update_contents(change.text, change.range, params.text_document.version)
       }
     }
     @result_cache.invalidate(file_uri)

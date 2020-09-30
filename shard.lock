@@ -1,5 +1,13 @@
 version: 2.0
 shards:
+  bisect:
+    git: https://github.com/spider-gazelle/bisect.git
+    version: 1.2.0
+
+  priority-queue:
+    git: https://github.com/spider-gazelle/priority-queue.git
+    version: 1.0.0+git.commit.bde47d11cb4b4d1ed7680a7f417ff707c434b1e4
+
   sentry:
     git: https://github.com/samueleaton/sentry.git
     version: 0.3.2+git.commit.edcafd89be2658a4bd306ca1096ef9918c727edf

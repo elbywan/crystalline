@@ -1,8 +1,11 @@
+require "priority-queue"
 require "uri"
 
 class Crystalline::TextDocument
   getter uri : URI
   @inner_contents : Array(String) = [] of String
+  getter! version : Int32
+  @pending_changes : Priority::Queue({String, LSP::Range}) = Priority::Queue({String, LSP::Range}).new
 
   def initialize(uri : String, contents : String)
     @uri = URI.parse(uri)
@@ -21,18 +24,51 @@ class Crystalline::TextDocument
     @inner_contents.size
   end
 
-  def update_contents(contents : String, range : LSP::Range? = nil)
+  def update_contents(contents : String, range : LSP::Range? = nil, version : Number? = nil)
     if range
-      # Incremental update.
-      prefix = @inner_contents[range.start.line]?.try &.[...range.start.character].chomp || ""
-      suffix = @inner_contents[range.end.line]?.try &.[range.end.character..]? || @inner_contents[range.end.line]? || ""
-      replacement_lines = String.build { |str|
-        str << prefix << contents << suffix
-      }.lines(chomp: false)
-      @inner_contents = (@inner_contents[...range.start.line]? || [] of String) + replacement_lines + (@inner_contents[range.end.line + 1...]? || [] of String)
+      # Incremental update
+      if version && check_version(version)
+        # Version is up-to-date
+        partial_update(contents, range, version)
+        # Check pending changes
+        loop do
+          break unless @pending_changes.first?.try(&.priority.== self.version + 1)
+          item = @pending_changes.shift
+          partial_update(*item.value, version: item.priority)
+        end
+      elsif version
+        # Some updates are missing
+        @pending_changes.push version, {contents, range}
+      else
+        # No version field.
+        partial_update(contents, range, version)
+      end
     else
-      # Full update.
-      self.contents = contents
+      # Full update
+      full_update(contents)
     end
+  end
+
+  private def check_version(version : Number)
+    if v = @version
+      v == version - 1
+    else
+      @version = version
+      true
+    end
+  end
+
+  private def partial_update(contents : String, range : LSP::Range, version : Number? = nil)
+    prefix = @inner_contents[range.start.line]?.try &.[...range.start.character].chomp || ""
+    suffix = @inner_contents[range.end.line]?.try &.[range.end.character..]? || @inner_contents[range.end.line]? || ""
+    replacement_lines = String.build { |str|
+      str << prefix << contents << suffix
+    }.lines(chomp: false)
+    @inner_contents = (@inner_contents[...range.start.line]? || [] of String) + replacement_lines + (@inner_contents[range.end.line + 1...]? || [] of String)
+    @version = version if version
+  end
+
+  private def full_update(contents : String)
+    self.contents = contents
   end
 end
