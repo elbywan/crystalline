@@ -70,7 +70,7 @@ class Crystalline::Workspace
     @result_cache.invalidate(file_uri)
     # spawn is needed because we are inside a lock
     # and compilation should not prevent unlocking the mutex
-    spawn self.compile(server, URI.parse file_uri)
+    spawn self.compile(server, URI.parse(file_uri), discard_nil_cached_result: true)
   end
 
   def format_document(params : LSP::DocumentFormattingParams) : {String, TextDocument}?
@@ -290,7 +290,7 @@ class Crystalline::Workspace
       # LSP::Log.info { "Node class: #{n.class}" }
       # LSP::Log.info { "Node type: #{n.try &.type?}" }
       # LSP::Log.info { "Node type class: #{n.try &.type?.try &.class}" }
-      # LSP::Log.info { "Nodes classes: #{nodes.map &.class}"}
+      # LSP::Log.info { "Nodes classes: #{nodes.map &.class}" }
       # LSP::Log.info { "Context: #{_context}" }
 
       if n.is_a? Crystal::Def || n.is_a? Crystal::Macro
