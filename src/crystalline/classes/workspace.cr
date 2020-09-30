@@ -50,9 +50,10 @@ class Crystalline::Workspace
   def update_document(server : LSP::Server, params : LSP::DidChangeTextDocumentParams)
     file_uri = params.text_document.uri
     @opened_documents[file_uri]?.try { |document|
-      params.content_changes.each { |change|
-        document.update_contents(change.text, change.range, params.text_document.version)
+      content_changes = params.content_changes.map { |change|
+        { change.text, change.range }
       }
+      document.update_contents(content_changes, version: params.text_document.version)
     }
     @result_cache.invalidate(file_uri)
     entry_point?.try { |entry|
@@ -458,7 +459,7 @@ class Crystalline::Workspace
 
       # LSP::Log.info { "Node at cursor: #{n}" }
       # LSP::Log.info { "Node class: #{n.class}" }
-      # LSP::Log.info { "Node type: #{n.type?}" }
+      # # LSP::Log.info { "Node type: #{n.type?}" }
       # LSP::Log.info { "Node type class: #{n.type?.try &.class}" }
       # LSP::Log.info { "Node type defs: #{n.type?.try &.defs}" }
 

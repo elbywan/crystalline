@@ -24,18 +24,26 @@ class Crystalline::TextDocument
     @inner_contents.size
   end
 
-  def update_contents(contents : String, range : LSP::Range? = nil, version : Number? = nil)
+  alias ContentChange = { contents: String, range: LSP::Range? }
+  def update_contents(content_changes = Array(ContentChange), version : Number? = nil)
+    content_changes.each { |change|
+      update_contents(*change, version: version)
+    }
+
+    # Check for pending changes
+    loop do
+      break unless @pending_changes.first?.try(&.priority.== self.version + 1)
+      item = @pending_changes.shift
+      partial_update(*item.value, version: item.priority)
+    end
+  end
+
+  private def update_contents(contents : String, range : LSP::Range? = nil, version : Number? = nil)
     if range
       # Incremental update
       if version && check_version(version)
         # Version is up-to-date
         partial_update(contents, range, version)
-        # Check pending changes
-        loop do
-          break unless @pending_changes.first?.try(&.priority.== self.version + 1)
-          item = @pending_changes.shift
-          partial_update(*item.value, version: item.priority)
-        end
       elsif version
         # Some updates are missing
         @pending_changes.push version, {contents, range}
@@ -50,12 +58,8 @@ class Crystalline::TextDocument
   end
 
   private def check_version(version : Number)
-    if v = @version
-      v == version - 1
-    else
-      @version = version
-      true
-    end
+    @version ||= version
+    @version == version - 1 || @version == version
   end
 
   private def partial_update(contents : String, range : LSP::Range, version : Number? = nil)
