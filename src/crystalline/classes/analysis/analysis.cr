@@ -6,21 +6,21 @@ require "./concrete_semantic_visitor"
 
 module Crystalline::Analysis
   # Compile a target *file_uri*.
-  def self.compile(server : LSP::Server, file_uri : URI, *, file_overrides : Hash(String, String)? = nil, ignore_diagnostics = false, wants_doc = false, permissive = false, top_level = false)
+  def self.compile(server : LSP::Server, file_uri : URI, *, file_overrides : Hash(String, String)? = nil, ignore_diagnostics = false, wants_doc = false, permissive = true, top_level = false)
     if file_uri.scheme == "file"
       file = File.new file_uri.decoded_path
       sources = [
         Crystal::Compiler::Source.new(file_uri.decoded_path, file.gets_to_end),
       ]
       file.close
-      self.compile(server, sources, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, permissive: permissive, top_level: top_level)
+      self.compile(server, sources, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, top_level: top_level)
     end
   end
 
   # Compile an array of *sources*.
-  def self.compile(server : LSP::Server, sources : Array(Crystal::Compiler::Source), *, file_overrides : Hash(String, String)? = nil, ignore_diagnostics = false, wants_doc = false, permissive = false, top_level = false)
+  def self.compile(server : LSP::Server, sources : Array(Crystal::Compiler::Source), *, file_overrides : Hash(String, String)? = nil, ignore_diagnostics = false, wants_doc = false, permissive = true, top_level = false)
     diagnostics = Diagnostics.new
-    reply_channel = Channel(Crystal::Compiler::Result | Exception).new
+    reply_channel = Channel({Crystal::Compiler::Result | Exception, Array(Crystal::Exception)?}).new
 
     # Delegate heavy processing to a separate thread.
     Thread.new do
@@ -32,32 +32,40 @@ module Crystalline::Analysis
         compiler.no_cleanup = true
         compiler.file_overrides = file_overrides
         compiler.wants_doc = wants_doc
-        result = begin
+        reply = begin
           if top_level
             # Top level only.
-            compiler.top_level_semantic(sources)
+            {compiler.top_level_semantic(sources), nil}
           elsif permissive
-            # Permissive means that if an error is thrown during the semantic phase, we still get a partially typed AST back.
+            # Permissive means that errors are collected instead of throwing during the semantic phase, and we still get a partially typed AST back.
             compiler.permissive_compile(sources, "")
           else
             # Regular parser + semantic analysis phases.
-            compiler.compile(sources, "")
+            {compiler.compile(sources, ""), nil}
           end
         end
-        reply_channel.send(result)
+        reply_channel.send(reply)
       rescue e : Exception
-        reply_channel.send(e)
+        reply_channel.send({e, nil})
       ensure
         kill_thread.send nil
       end
       kill_thread.receive
     end
-    result = reply_channel.receive
+    result, errors = reply_channel.receive
 
     raise result if result.is_a? Exception
+
     result.program.requires.each { |path|
-      diagnostics.init_value("file://#{path}")
+      diagnostics.try &.init_value("file://#{path}")
     }
+
+    errors.try &.each do |e|
+      if e.is_a?(Crystal::TypeException) || e.is_a?(Crystal::SyntaxException)
+        diagnostics.append_from_exception(e) unless ignore_diagnostics
+      end
+    end
+
     result
   rescue e : Exception
     if e.is_a?(Crystal::TypeException) || e.is_a?(Crystal::SyntaxException)

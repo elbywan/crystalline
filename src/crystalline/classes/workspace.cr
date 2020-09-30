@@ -113,7 +113,7 @@ class Crystalline::Workspace
   class_getter compilation_lock = Mutex.new
 
   # Use the crystal compiler to typecheck the program.
-  def compile(server : LSP::Server, file_uri : URI? = nil, *, in_memory = false, ignore_diagnostics = false, wants_doc = false, text_overrides = nil, permissive = false, top_level = false, discard_nil_cached_result = false)
+  def compile(server : LSP::Server, file_uri : URI? = nil, *, in_memory = false, ignore_diagnostics = false, wants_doc = false, text_overrides = nil, permissive = true, top_level = false, discard_nil_cached_result = false)
     # We need a target.
     return nil unless file_uri || entry_point?
 
@@ -176,7 +176,7 @@ class Crystalline::Workspace
             file_overrides[file_path] = contents
           }
         end
-        result = Analysis.compile(server, sources || target, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, permissive: permissive, top_level: top_level)
+        result = Analysis.compile(server, sources || target, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, top_level: top_level)
         # Store the result in the cache, unless a client event invalided the previous cache.
         # For instance if a compilation is running, but the user saved the document in the meantime (before completion)
         # then we discard the result because it is already outdated.
@@ -274,7 +274,7 @@ class Crystalline::Workspace
   end
 
   def hover(server : LSP::Server, file_uri : URI, position : LSP::Position)
-    result = self.compile(server, file_uri, in_memory: true, ignore_diagnostics: true, wants_doc: true, permissive: true)
+    result = self.compile(server, file_uri, in_memory: true, ignore_diagnostics: true, wants_doc: true)
     location = Crystal::Location.new(
       file_uri.decoded_path,
       line_number: position.line + 1,
@@ -343,7 +343,7 @@ class Crystalline::Workspace
   end
 
   def definitions(server : LSP::Server, file_uri : URI, position : LSP::Position)
-    result = self.compile(server, file_uri, in_memory: true, ignore_diagnostics: true, wants_doc: true, permissive: true)
+    result = self.compile(server, file_uri, in_memory: true, ignore_diagnostics: true, wants_doc: true)
     location = Crystal::Location.new(
       file_uri.decoded_path,
       line_number: position.line + 1,
@@ -449,7 +449,7 @@ class Crystalline::Workspace
     )
 
     # Trigger a "permissive" compilation.
-    result = self.compile(server, file_uri, in_memory: true, ignore_diagnostics: true, wants_doc: true, text_overrides: text_overrides, permissive: true, discard_nil_cached_result: true)
+    result = self.compile(server, file_uri, in_memory: true, ignore_diagnostics: true, wants_doc: true, text_overrides: text_overrides, discard_nil_cached_result: true)
     return unless result
 
     nodes, _ = Analysis.nodes_at_cursor(result, location)
