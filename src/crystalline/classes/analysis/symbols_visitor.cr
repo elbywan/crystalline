@@ -8,12 +8,12 @@ module Crystalline
       range = Utils.lsp_range_from_node(@parent_macro_call || node)
       name = node.responds_to?(:name) ? node.name.to_s : node.to_s
       LSP::DocumentSymbol.new({
-        name: name,
-        detail: detail,
-        kind: kind,
-        range: range,
+        name:            name,
+        detail:          detail,
+        kind:            kind,
+        range:           range,
         selection_range: range,
-        children: [] of LSP::DocumentSymbol
+        children:        [] of LSP::DocumentSymbol,
       })
     end
 
@@ -91,7 +91,7 @@ module Crystalline
     end
 
     def visit(node : Crystal::Arg)
-      if(@parent_symbol.try &.kind.enum?)
+      if (@parent_symbol.try &.kind.enum?)
         symbol = create_symbol_from_node(node, :enum_member)
         append_symbol(symbol)
       end
@@ -99,7 +99,7 @@ module Crystalline
     end
 
     def visit(node : Crystal::Call)
-      if(expanded = node.expanded)
+      if (expanded = node.expanded)
         @parent_macro_call = node
         expanded.accept(self)
         @parent_macro_call = nil
@@ -114,13 +114,13 @@ module Crystalline
     end
 
     def visit(node : Crystal::InstanceVar)
-      symbol = create_symbol_from_node(node, :variable)
+      symbol = create_symbol_from_node(node, :field)
       append_symbol(symbol)
       false
     end
 
     def visit(node : Crystal::ClassVar)
-      symbol = create_symbol_from_node(node, :variable)
+      symbol = create_symbol_from_node(node, :field)
       append_symbol(symbol)
       false
     end

@@ -566,13 +566,13 @@ class Crystalline::Workspace
 
   def document_symbols(server : LSP::Server, file_uri : URI)
     @opened_documents[file_uri.to_s]?.try { |text_document|
-      sources = [
-        Crystal::Compiler::Source.new(file_uri.decoded_path, text_document.contents),
-      ]
-      result = Analysis.compile(server, sources, wants_doc: false, top_level: true)
-      symbols_visitor = DocumentSymbolsVisitor.new
-      result.try &.node.accept(symbols_visitor)
-      symbols_visitor.symbols
+      parser = Crystal::Parser.new(text_document.contents)
+      parser.filename = file_uri.decoded_path
+      parser.wants_doc = false
+
+      DocumentSymbolsVisitor.new.tap { |visitor|
+        parser.parse.accept(visitor)
+      }.symbols
     }
   end
 end
