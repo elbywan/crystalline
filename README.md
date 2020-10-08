@@ -141,10 +141,15 @@ Or just use a different LLVM major version until this issue is fixed upstream.
 
 `Crystalline` is meant to be used alongside an editor extension.
 
-For instance if you are a VSCode user, add the [Crystal Language extension](https://marketplace.visualstudio.com/items?itemName=crystal-lang-tools.crystal-lang).
-Then in the configuration, type the **absolute** location of the binary in the following field:
+#### VSCode
+
+- Add the [Crystal Language extension](https://marketplace.visualstudio.com/items?itemName=crystal-lang-tools.crystal-lang).
+
+- In the configuration, type the **absolute** location of the binary in the following field:
 
 ![vscode screen](assets/vscode_extension_screen.png)
+
+- Reload the window by pressing CMD/CTRL + SHIFT + P and select `Developer: Reload Window` (or as an alternative, restart VSCode).
 
 ### Entry point
 
