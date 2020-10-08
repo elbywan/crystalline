@@ -2,7 +2,6 @@ require "compiler/crystal/**"
 require "../diagnostics"
 require "./cursor_visitor"
 require "./submodule_visitor"
-require "./concrete_semantic_visitor"
 
 module Crystalline::Analysis
   # Compile a target *file_uri*.

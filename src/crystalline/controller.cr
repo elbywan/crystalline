@@ -73,9 +73,18 @@ class Crystalline::Controller
         file_uri = URI.parse message.params.text_document.uri
         workspace.completion(@server, file_uri, message.params.position, message.params.context.try &.trigger_character)
       end
+    when LSP::DocumentSymbolsRequest
+      file_uri = URI.parse message.params.text_document.uri
+      workspace.document_symbols(@server, file_uri)
     else
       nil
     end
+  rescue e : Crystal::TypeException
+    LSP::Log.warn(exception: e) { e.to_s }
+    nil
+  rescue e : Crystal::SyntaxException
+    LSP::Log.warn(exception: e) { e.to_s }
+    nil
   ensure
     @pending_requests.delete message.id
   end
@@ -101,9 +110,17 @@ class Crystalline::Controller
     when LSP::CancelNotification
       @pending_requests.delete message.params.id
     end
+  rescue e : Crystal::TypeException
+    LSP::Log.warn(exception: e) { e.to_s }
+  rescue e : Crystal::SyntaxException
+    LSP::Log.warn(exception: e) { e.to_s }
   end
 
   def on_response(message : LSP::ResponseMessage, original_message : LSP::RequestMessage?) : Nil
     original_message.try &.on_response(message.result, message.error)
+  rescue e : Crystal::TypeException
+    LSP::Log.warn(exception: e) { e.to_s }
+  rescue e : Crystal::SyntaxException
+    LSP::Log.warn(exception: e) { e.to_s }
   end
 end

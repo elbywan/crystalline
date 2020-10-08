@@ -189,7 +189,7 @@ Syntax and semantic checks on save.
 
 #### Limited Autocompletion
 
-Triggered when typing the `.` or `:` characters and list (depending on the target) method definitions, macros or module/class/struct names.
+List (depending on the target) method definitions, macros or module/class/struct names or symbols available in the current context.
 
 #### Formatting
 
@@ -202,6 +202,10 @@ By clicking on a symbol with the Cmd or Ctrl key pressed (editor/platform depend
 #### Hover information
 
 Hovering should display (when possible) either a variable type, a function definition signature or the expanded macro.
+
+#### Document symbols
+
+Fetch all the symbols in a given file, used in VSCode to populate the Outline view and the Breadcrumbs.
 
 ## Limitations
 

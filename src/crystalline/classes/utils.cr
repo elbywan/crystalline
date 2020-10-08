@@ -65,4 +65,66 @@ module Crystalline::Utils
       resolved_path
     end
   end
+
+  def self.lsp_range_from_node(node : Crystal::ASTNode)
+    start_location = node.location
+    end_location = node.end_location || start_location
+    LSP::Range.new({
+      start: LSP::Position.new({
+        line:      start_location.try(&.line_number.- 1) || 0,
+        character: start_location.try(&.column_number.- 1) || 0,
+      }),
+      end: LSP::Position.new({
+        line:      end_location.try(&.line_number.- 1) || 0,
+        character: end_location.try(&.column_number.- 1) || 0,
+      }),
+    })
+  end
+
+  # Format a method definition or macro.
+  def self.format_def(d : Crystal::Def | Crystal::Macro, *, short = false)
+    String.build { |str|
+      unless short
+        str << d.visibility.to_s.downcase
+        str << ' '
+      end
+
+      str << d.name
+      str << ' '
+
+      if d.args.size > 0 || d.block_arg || d.double_splat
+        str << '('
+        printed_arg = false
+        d.args.each_with_index do |arg, i|
+          str << ", " if printed_arg
+          str << '*' if d.splat_index == i
+          str << arg.to_s
+          printed_arg = true
+        end
+        if double_splat = d.double_splat
+          str << ", " if printed_arg
+          str << "**"
+          str << double_splat
+          printed_arg = true
+        end
+        if d.block_arg
+          str << ", " if printed_arg
+          str << '&'
+          printed_arg = true
+        end
+        str << ')'
+      end
+      if d.responds_to?(:return_type) && (return_type = d.return_type)
+        str << " : #{return_type}"
+      end
+
+      if d.responds_to?(:free_vars) && (free_vars = d.free_vars)
+        str << " forall "
+        free_vars.join(str, ", ")
+      end
+    }
+  rescue e
+    # LSP::Log.error(exception: e) { e.to_s }
+    d.to_s
+  end
 end

@@ -103,7 +103,6 @@ class Crystalline::Workspace
     return unless target = entry_point?
 
     Analysis.compile(server, target, ignore_diagnostics: true, wants_doc: false, top_level: true).try { |result|
-      ConcreteSemanticVisitor.new(result.program).visit(result.node)
       @dependencies = result.program.requires
     }
   rescue
@@ -206,53 +205,6 @@ class Crystalline::Workspace
     end
   end
 
-  # Format a method definition or macro.
-  private def format_def(d : Crystal::Def | Crystal::Macro, *, short = false)
-    String.build { |str|
-      unless short
-        str << d.visibility.to_s.downcase
-        str << ' '
-      end
-
-      str << d.name
-      str << ' '
-
-      if d.args.size > 0 || d.block_arg || d.double_splat
-        str << '('
-        printed_arg = false
-        d.args.each_with_index do |arg, i|
-          str << ", " if printed_arg
-          str << '*' if d.splat_index == i
-          str << arg.to_s
-          printed_arg = true
-        end
-        if double_splat = d.double_splat
-          str << ", " if printed_arg
-          str << "**"
-          str << double_splat
-          printed_arg = true
-        end
-        if d.block_arg
-          str << ", " if printed_arg
-          str << '&'
-          printed_arg = true
-        end
-        str << ')'
-      end
-      if d.responds_to?(:return_type) && (return_type = d.return_type)
-        str << " : #{return_type}"
-      end
-
-      if d.responds_to?(:free_vars) && (free_vars = d.free_vars)
-        str << " forall "
-        free_vars.join(str, ", ")
-      end
-    }
-  rescue e
-    # LSP::Log.error(exception: e) { e.to_s }
-    d.to_s
-  end
-
   private def append_markdown_doc(contents : Array(String), doc : String?)
     if doc
       contents << "----------"
@@ -295,7 +247,7 @@ class Crystalline::Workspace
       # LSP::Log.info { "Context: #{_context}" }
 
       if n.is_a? Crystal::Def || n.is_a? Crystal::Macro
-        contents << code_markdown(format_def(n), language: "crystal")
+        contents << code_markdown(Utils.format_def(n), language: "crystal")
         append_markdown_doc contents, n.doc
       elsif n.responds_to? :resolved_type
         str = ""
@@ -309,7 +261,7 @@ class Crystalline::Workspace
         append_markdown_doc contents, n.resolved_type.doc
       elsif n.is_a? Crystal::Call
         if definition = n.target_defs.try &.first?
-          contents << code_markdown(format_def(definition), language: "crystal")
+          contents << code_markdown(Utils.format_def(definition), language: "crystal")
         elsif n.expanded && n.expanded_macro
           contents << code_markdown(n.expanded.to_s, language: "crystal")
         end
@@ -486,11 +438,11 @@ class Crystalline::Workspace
             })
 
             completion_items << LSP::CompletionItem.new({
-              label:         format_def(definition, short: true),
+              label:         Utils.format_def(definition, short: true),
               insert_text:   def_name,
               kind:          LSP::CompletionItemKind::Function,
               filter_text:   def_name,
-              detail:        format_def(definition),
+              detail:        Utils.format_def(definition),
               text_edit:     text_edit,
               sort_text:     (nesting + 1).chr.to_s + def_name,
               documentation: documentation.try { |doc|
@@ -513,11 +465,11 @@ class Crystalline::Workspace
             })
 
             completion_items << LSP::CompletionItem.new({
-              label:         format_def(macro_def, short: true),
+              label:         Utils.format_def(macro_def, short: true),
               insert_text:   macro_name,
               kind:          LSP::CompletionItemKind::Method,
               filter_text:   macro_name,
-              detail:        format_def(macro_def),
+              detail:        Utils.format_def(macro_def),
               text_edit:     text_edit,
               sort_text:     (nesting + 1).chr.to_s + macro_name,
               documentation: documentation.try { |doc|
@@ -610,5 +562,17 @@ class Crystalline::Workspace
     end
   rescue
     nil
+  end
+
+  def document_symbols(server : LSP::Server, file_uri : URI)
+    @opened_documents[file_uri.to_s]?.try { |text_document|
+      sources = [
+        Crystal::Compiler::Source.new(file_uri.decoded_path, text_document.contents),
+      ]
+      result = Analysis.compile(server, sources, wants_doc: false, top_level: true)
+      symbols_visitor = DocumentSymbolsVisitor.new
+      result.try &.node.accept(symbols_visitor)
+      symbols_visitor.symbols
+    }
   end
 end

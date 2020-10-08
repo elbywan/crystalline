@@ -39,6 +39,7 @@ module LSP
       "textDocument/hover":             HoverRequest,
       "textDocument/definition":        DefinitionRequest,
       "textDocument/signatureHelp":     SignatureHelpRequest,
+      "textDocument/documentSymbol":    DocumentSymbolsRequest,
     }, default: UnknownRequest
   end
 

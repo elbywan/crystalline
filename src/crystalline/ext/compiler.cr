@@ -18,7 +18,7 @@ module Crystal
   end
 
   class SemanticVisitor < Visitor
-    # Make it possible to compile in-memory.
+    # Make it possible to visit in-memory.
     def visit(node : Require)
       if expanded = node.expanded
         expanded.accept self
