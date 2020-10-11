@@ -74,8 +74,10 @@ class Crystalline::Controller
         workspace.completion(@server, file_uri, message.params.position, message.params.context.try &.trigger_character)
       end
     when LSP::DocumentSymbolsRequest
-      file_uri = URI.parse message.params.text_document.uri
-      workspace.document_symbols(@server, file_uri)
+      @documents_lock.synchronize do
+        file_uri = URI.parse message.params.text_document.uri
+        workspace.document_symbols(@server, file_uri)
+      end
     else
       nil
     end
