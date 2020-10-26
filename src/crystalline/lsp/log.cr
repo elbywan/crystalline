@@ -19,9 +19,9 @@ module LSP
                      else
                        LSP::MessageType::Log
                      end
-      log_message = LSP::LogMessageNotification.new({
-        params: LSP::LogMessageParams.new({type: message_type, message: entry.message}),
-      })
+      log_message = LSP::LogMessageNotification.new(
+        params: LSP::LogMessageParams.new(type: message_type, message: entry.message),
+      )
       @server.send(log_message, do_not_log: true)
     end
   end

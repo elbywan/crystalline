@@ -50,9 +50,9 @@ class Crystalline::Diagnostics
 
   def publish(server : LSP::Server)
     @diagnostics.each { |key, value|
-      server.try &.send(LSP::PublishDiagnosticsNotification.new({
-        params: LSP::PublishDiagnosticsParams.new({uri: key, diagnostics: value}),
-      }))
+      server.try &.send(LSP::PublishDiagnosticsNotification.new(
+        params: LSP::PublishDiagnosticsParams.new(uri: key, diagnostics: value),
+      ))
     }
   end
 end

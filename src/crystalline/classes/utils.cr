@@ -69,16 +69,16 @@ module Crystalline::Utils
   def self.lsp_range_from_node(node : Crystal::ASTNode)
     start_location = node.location
     end_location = node.end_location || start_location
-    LSP::Range.new({
-      start: LSP::Position.new({
+    LSP::Range.new(
+      start: LSP::Position.new(
         line:      start_location.try(&.line_number.- 1) || 0,
         character: start_location.try(&.column_number.- 1) || 0,
-      }),
-      end: LSP::Position.new({
+      ),
+      end: LSP::Position.new(
         line:      end_location.try(&.line_number.- 1) || 0,
         character: end_location.try(&.column_number.- 1) || 0,
-      }),
-    })
+      ),
+    )
   end
 
   # Format a method definition or macro.

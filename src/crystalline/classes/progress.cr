@@ -8,12 +8,12 @@ class Crystalline::Progress
   end
 
   def report(server, *, async = false, &cb : Proc(String?))
-    create_request = LSP::WorkDoneProgressCreateRequest.new({
-      id:     0,
-      params: LSP::WorkDoneProgressCreateParams.new({
+    create_request = LSP::WorkDoneProgressCreateRequest.new(
+      id: 0,
+      params: LSP::WorkDoneProgressCreateParams.new(
         token: @token,
-      }),
-    })
+      ),
+    )
 
     create_request.on_response {
       if async
@@ -29,24 +29,24 @@ class Crystalline::Progress
   end
 
   private def report_callback(server, &cb : Proc(String?))
-    server.send(LSP::ProgressNotification.new({
-      params: LSP::ProgressParams.new({
+    server.send(LSP::ProgressNotification.new(
+      params: LSP::ProgressParams.new(
         token: @token,
-        value: LSP::WorkDoneProgressBegin.new({
-          title:   @title,
+        value: LSP::WorkDoneProgressBegin.new(
+          title: @title,
           message: @message,
-        }),
-      }),
-    }))
+        ),
+      ),
+    ))
     end_message = cb.call
   ensure
-    server.send(LSP::ProgressNotification.new({
-      params: LSP::ProgressParams.new({
+    server.send(LSP::ProgressNotification.new(
+      params: LSP::ProgressParams.new(
         token: @token,
-        value: LSP::WorkDoneProgressEnd.new({
+        value: LSP::WorkDoneProgressEnd.new(
           message: end_message,
-        }),
-      }),
-    }))
+        ),
+      ),
+    ))
   end
 end

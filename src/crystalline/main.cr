@@ -8,20 +8,20 @@ module Crystalline
   VersionFromShard.declare(__DIR__)
 
   # Supported server capabilities.
-  SERVER_CAPABILITIES = LSP::ServerCapabilities.new({
-    text_document_sync:                 LSP::TextDocumentSyncKind::Incremental,
-    document_formatting_provider:       true,
+  SERVER_CAPABILITIES = LSP::ServerCapabilities.new(
+    text_document_sync: LSP::TextDocumentSyncKind::Incremental,
+    document_formatting_provider: true,
     document_range_formatting_provider: true,
-    completion_provider:                LSP::CompletionOptions.new({
+    completion_provider: LSP::CompletionOptions.new(
       trigger_characters: [".", ":", "@"],
-    }),
-    hover_provider:      true,
+    ),
+    hover_provider: true,
     definition_provider: true,
     document_symbol_provider: true,
-    # signature_help_provider: LSP::SignatureHelpOptions.new({
+      # signature_help_provider: LSP::SignatureHelpOptions.new(
     #   trigger_characters: ["(", " "]
-    # }),
-  })
+    # ),
+)
 
   module EnvironmentConfig
     # Add the `crystal env` environment variables to the current env.

@@ -64,13 +64,13 @@ class LSP::Server
 
   # Reply to a *request* initiated by the client with the provided *result*.
   def reply(request : LSP::RequestMessage, *, result : T, do_not_log = false) forall T
-    response_message = LSP::ResponseMessage(T).new({id: request.id || @max_request_id.add(1), result: result})
+    response_message = LSP::ResponseMessage(T).new(id: request.id || @max_request_id.add(1), result: result)
     send(message: response_message, do_not_log: do_not_log)
   end
 
   # Reply to a *request* initiated by the client with an error message containing the *exception* details.
   def reply(request : LSP::RequestMessage, *, exception, do_not_log = false)
-    response_message = LSP::ResponseMessage(Nil).new({id: request.id, error: LSP::ResponseError.new(exception)})
+    response_message = LSP::ResponseMessage(Nil).new(id: request.id, error: LSP::ResponseError.new(exception))
     send(message: response_message, do_not_log: do_not_log)
   end
 
@@ -131,7 +131,7 @@ class LSP::Server
         else
           init_result = nil
         end
-        reply(initialize_message, result: init_result || LSP::InitializeResult.new({capabilities: @server_capabilities}))
+        reply(initialize_message, result: init_result || LSP::InitializeResult.new(capabilities: @server_capabilities))
         break
       elsif initialize_message.is_a? LSP::RequestMessage
         reply(initialize_message, exception: LSP::Exception.new(

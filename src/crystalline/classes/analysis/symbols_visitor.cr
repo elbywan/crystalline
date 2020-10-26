@@ -7,14 +7,14 @@ module Crystalline
     private def create_symbol_from_node(node : Crystal::ASTNode, kind : LSP::SymbolKind, detail : String? = nil)
       range = Utils.lsp_range_from_node(@parent_macro_call || node)
       name = node.responds_to?(:name) ? node.name.to_s : node.to_s
-      LSP::DocumentSymbol.new({
+      LSP::DocumentSymbol.new(
         name:            name,
         detail:          detail,
         kind:            kind,
         range:           range,
         selection_range: range,
         children:        [] of LSP::DocumentSymbol,
-      })
+      )
     end
 
     private def append_symbol(symbol : LSP::DocumentSymbol)

@@ -66,10 +66,10 @@ module LSP
     def initialize(line : Int32?, column : Int32?, size : Int32?, @message, @source)
       line = line || 0
       size = size || 1
-      @range = Range.new({
-        start: Position.new({line: line - 1, character: column - 1}),
-        end:   Position.new({line: line - 1, character: column + size - 1}),
-      })
+      @range = Range.new(
+        start: Position.new(line: line - 1, character: column - 1),
+        end: Position.new(line: line - 1, character: column + size - 1),
+      )
       @severity = DiagnosticSeverity::Error.value
     end
   end

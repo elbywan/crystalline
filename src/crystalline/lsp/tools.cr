@@ -12,7 +12,13 @@ module LSP
   module Initializer
     macro included
       {% verbatim do %}
-      def initialize(args : NamedTuple)
+      def self.new(**args)
+        instance = self.allocate
+        instance.initialize(args)
+        instance
+      end
+
+      private def initialize(args : NamedTuple)
         {% for ivar in @type.instance_vars %}
           {% default_value = ivar.default_value %}
           {% if ivar.type.nilable? %}
