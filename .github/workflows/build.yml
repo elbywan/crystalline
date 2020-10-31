@@ -16,7 +16,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
     - name: Install Crystal
-      run: brew install openssl crystal
+      run: brew uninstall llvm && brew install openssl crystal llvm@10
     - name: Install dependencies
       run: shards install --production
     - name: Build the binary
