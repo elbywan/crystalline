@@ -11,17 +11,16 @@ on:
 jobs:
   macos:
     runs-on: macos-latest
-
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
     - name: Install Crystal
-      run: brew uninstall llvm && brew install openssl crystal llvm@10
+      run: brew install openssl crystal && brew uninstall --ignore-dependencies llvm && brew install llvm@9
     - name: Install dependencies
       run: shards install --production
     - name: Build the binary
       env:
-        LLVM_CONFIG: /usr/local/opt/llvm/bin/llvm-config
+        LLVM_CONFIG: /usr/local/opt/llvm@9/bin/llvm-config
       run: |
         ln -s /usr/lib/libxml2.2.dylib /usr/local/lib/liblibxml2.tbd.dylib
         shards build crystalline --release --no-debug -Dpreview_mt --stats --progress
