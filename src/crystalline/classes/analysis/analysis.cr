@@ -25,12 +25,15 @@ module Crystalline::Analysis
     Thread.new do
       kill_thread = Channel(Nil).new
       spawn same_thread: true do
+        dev_null = File.open(File::NULL, "w")
         compiler = Crystal::Compiler.new
         compiler.no_codegen = true
         compiler.color = false
         compiler.no_cleanup = true
         compiler.file_overrides = file_overrides
         compiler.wants_doc = wants_doc
+        compiler.stdout = dev_null
+        compiler.stderr = dev_null
         reply = begin
           if top_level
             # Top level only.
@@ -47,6 +50,7 @@ module Crystalline::Analysis
       rescue e : Exception
         reply_channel.send({e, nil})
       ensure
+        dev_null.try &.close
         kill_thread.send nil
       end
       kill_thread.receive
