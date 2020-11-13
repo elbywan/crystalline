@@ -106,6 +106,9 @@ module Crystalline
         else
           true
         end
+      elsif node.is_a? Crystal::Call && node.expanded && node.expanded_macro
+        # Visit macro blocks.
+        node.block.try &.accept(self)
       else
         contains_target(node)
       end

@@ -186,4 +186,12 @@ module Crystal
       end
     end
   end
+
+  class MacroInterpreter < Visitor
+    def visit(node : MacroExpression)
+      previous_def.tap {
+        node.expanded = @last
+      }
+    end
+  end
 end

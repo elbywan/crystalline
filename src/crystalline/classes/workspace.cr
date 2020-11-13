@@ -241,6 +241,7 @@ class Crystalline::Workspace
 
       # LSP::Log.info { "Node at cursor: #{n}" }
       # LSP::Log.info { "Node class: #{n.class}" }
+      # LSP::Log.info { "Node expansion: #{n.expanded if n.responds_to? :expan}" }
       # LSP::Log.info { "Node type: #{n.try &.type?}" }
       # LSP::Log.info { "Node type class: #{n.try &.type?.try &.class}" }
       # LSP::Log.info { "Nodes classes: #{nodes.map &.class}" }
@@ -249,6 +250,8 @@ class Crystalline::Workspace
       if n.is_a? Crystal::Def || n.is_a? Crystal::Macro
         contents << code_markdown(Utils.format_def(n), language: "crystal")
         append_markdown_doc contents, n.doc
+      elsif (n.is_a? Crystal::MacroExpression || n.is_a? Crystal::MacroIf) && n.expanded
+        contents << code_markdown(n.expanded.to_s, language: "crystal")
       elsif n.responds_to? :resolved_type
         str = ""
         if n.responds_to? :name
@@ -286,7 +289,7 @@ class Crystalline::Workspace
 
       LSP::Hover.new(
         contents: LSP::MarkupContent.new(
-          kind:  LSP::MarkupKind::MarkDown,
+          kind: LSP::MarkupKind::MarkDown,
           value: contents.join "\n",
         ),
       )
@@ -318,25 +321,25 @@ class Crystalline::Workspace
 
           origin_selection_range = LSP::Range.new(
             start: LSP::Position.new(line: origin_location.line_number - 1, character: origin_location.column_number - 1),
-            end:   LSP::Position.new(line: origin_end_location.line_number - 1, character: origin_end_location.column_number),
+            end: LSP::Position.new(line: origin_end_location.line_number - 1, character: origin_end_location.column_number),
           )
           target_range = LSP::Range.new(
             start: LSP::Position.new(line: start_loc.line_number - 1, character: start_loc.column_number - 1),
-            end:   LSP::Position.new(line: end_loc.line_number - 1, character: end_loc.column_number),
+            end: LSP::Position.new(line: end_loc.line_number - 1, character: end_loc.column_number),
           )
 
           LSP::LocationLink.new(
-            target_uri:             target_uri,
+            target_uri: target_uri,
             origin_selection_range: origin_selection_range,
-            target_range:           target_range,
+            target_range: target_range,
             target_selection_range: target_range,
           )
         else
           LSP::Location.new(
-            uri:   "file://#{start_loc.original_filename}",
+            uri: "file://#{start_loc.original_filename}",
             range: LSP::Range.new(
               start: LSP::Position.new(line: start_loc.line_number - 1, character: start_loc.column_number - 1),
-              end:   LSP::Position.new(line: end_loc.line_number - 1, character: end_loc.column_number),
+              end: LSP::Position.new(line: end_loc.line_number - 1, character: end_loc.column_number),
             ),
           )
         end
@@ -417,7 +420,7 @@ class Crystalline::Workspace
 
       range = LSP::Range.new(
         start: LSP::Position.new(line: position.line, character: position.character - left_offset + 1),
-        end:   LSP::Position.new(line: position.line, character: position.character + right_offset),
+        end: LSP::Position.new(line: position.line, character: position.character + right_offset),
       )
 
       case trigger_character
@@ -433,21 +436,21 @@ class Crystalline::Workspace
             documentation = (owner_prefix + (definition.doc || ""))
 
             text_edit = LSP::TextEdit.new(
-              range:    range,
+              range: range,
               new_text: def_name,
             )
 
             completion_items << LSP::CompletionItem.new(
-              label:         Utils.format_def(definition, short: true),
-              insert_text:   def_name,
-              kind:          LSP::CompletionItemKind::Function,
-              filter_text:   def_name,
-              detail:        Utils.format_def(definition),
-              text_edit:     text_edit,
-              sort_text:     (nesting + 1).chr.to_s + def_name,
+              label: Utils.format_def(definition, short: true),
+              insert_text: def_name,
+              kind: LSP::CompletionItemKind::Function,
+              filter_text: def_name,
+              detail: Utils.format_def(definition),
+              text_edit: text_edit,
+              sort_text: (nesting + 1).chr.to_s + def_name,
               documentation: documentation.try { |doc|
                 LSP::MarkupContent.new(
-                  kind:  LSP::MarkupKind::MarkDown,
+                  kind: LSP::MarkupKind::MarkDown,
                   value: doc,
                 )
               },
@@ -460,21 +463,21 @@ class Crystalline::Workspace
             documentation = (owner_prefix + (macro_def.doc || ""))
 
             text_edit = LSP::TextEdit.new(
-              range:    range,
+              range: range,
               new_text: macro_name,
             )
 
             completion_items << LSP::CompletionItem.new(
-              label:         Utils.format_def(macro_def, short: true),
-              insert_text:   macro_name,
-              kind:          LSP::CompletionItemKind::Method,
-              filter_text:   macro_name,
-              detail:        Utils.format_def(macro_def),
-              text_edit:     text_edit,
-              sort_text:     (nesting + 1).chr.to_s + macro_name,
+              label: Utils.format_def(macro_def, short: true),
+              insert_text: macro_name,
+              kind: LSP::CompletionItemKind::Method,
+              filter_text: macro_name,
+              detail: Utils.format_def(macro_def),
+              text_edit: text_edit,
+              sort_text: (nesting + 1).chr.to_s + macro_name,
               documentation: documentation.try { |doc|
                 LSP::MarkupContent.new(
-                  kind:  LSP::MarkupKind::MarkDown,
+                  kind: LSP::MarkupKind::MarkDown,
                   value: doc,
                 )
               },
@@ -496,17 +499,17 @@ class Crystalline::Workspace
             type_string = type.to_s
 
             text_edit = LSP::TextEdit.new(
-              range:    range,
+              range: range,
               new_text: type_string.lchop(node_type.to_s).lchop(trigger_character || ':'),
             )
 
             completion_items << LSP::CompletionItem.new(
-              label:         type_string,
-              text_edit:     text_edit,
-              kind:          Crystalline::Utils.map_completion_kind(type, default: LSP::CompletionItemKind::Module),
+              label: type_string,
+              text_edit: text_edit,
+              kind: Crystalline::Utils.map_completion_kind(type, default: LSP::CompletionItemKind::Module),
               documentation: type.doc.try { |doc|
                 LSP::MarkupContent.new(
-                  kind:  LSP::MarkupKind::MarkDown,
+                  kind: LSP::MarkupKind::MarkDown,
                   value: doc,
                 )
               },
@@ -522,16 +525,16 @@ class Crystalline::Workspace
         context.try &.each { |name, type|
           label = "#{name} : #{type}"
           text_edit = LSP::TextEdit.new(
-            range:    range,
+            range: range,
             new_text: name.lchop(trigger_character || ""),
           )
           completion_items << LSP::CompletionItem.new(
-            label:         label,
-            text_edit:     text_edit,
-            kind:          LSP::CompletionItemKind::Variable,
+            label: label,
+            text_edit: text_edit,
+            kind: LSP::CompletionItemKind::Variable,
             documentation: type.doc.try { |doc|
               LSP::MarkupContent.new(
-                kind:  LSP::MarkupKind::MarkDown,
+                kind: LSP::MarkupKind::MarkDown,
                 value: doc,
               )
             },
@@ -557,7 +560,7 @@ class Crystalline::Workspace
 
       LSP::CompletionList.new(
         is_incomplete: false,
-        items:         completion_items,
+        items: completion_items,
       )
     end
   rescue
