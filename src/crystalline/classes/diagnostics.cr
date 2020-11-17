@@ -19,10 +19,12 @@ class Crystalline::Diagnostics
   end
 
   def append_from_exception(error : Crystal::ErrorFormat)
-    error_stack = Deque(Crystal::ErrorFormat).new
+    bottom_error : Crystal::ErrorFormat = error
 
     loop do
-      error_stack.unshift error if error.is_a? Crystal::ErrorFormat
+      if error.is_a? Crystal::ErrorFormat
+        bottom_error = error
+      end
       if error.responds_to? :inner
         break unless (error = error.inner)
       else
@@ -30,7 +32,8 @@ class Crystalline::Diagnostics
       end
     end
 
-    error_stack.each { |err|
+    bottom_error.tap { |err|
+      err = err.as(Crystal::ErrorFormat)
       if err.filename.is_a? Crystal::VirtualFile && (expanded_source = err.filename.as(Crystal::VirtualFile).expanded_location)
         line = expanded_source.line_number || 1
         column = expanded_source.column_number

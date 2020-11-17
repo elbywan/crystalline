@@ -19,7 +19,7 @@ module Crystalline::Analysis
   # Compile an array of *sources*.
   def self.compile(server : LSP::Server, sources : Array(Crystal::Compiler::Source), *, file_overrides : Hash(String, String)? = nil, ignore_diagnostics = false, wants_doc = false, permissive = true, top_level = false)
     diagnostics = Diagnostics.new
-    reply_channel = Channel({Crystal::Compiler::Result | Exception, Array(Crystal::Exception)?}).new
+    reply_channel = Channel(Crystal::Compiler::Result | Exception).new
 
     # Delegate heavy processing to a separate thread.
     Thread.new do
@@ -37,25 +37,29 @@ module Crystalline::Analysis
         reply = begin
           if top_level
             # Top level only.
-            {compiler.top_level_semantic(sources), nil}
+            # if permissive
+            #   compiler.permissive_top_level_semantic(sources)
+            # else
+            compiler.top_level_semantic(sources)
+            # end
           elsif permissive
             # Permissive means that errors are collected instead of throwing during the semantic phase, and we still get a partially typed AST back.
             compiler.permissive_compile(sources, "")
           else
             # Regular parser + semantic analysis phases.
-            {compiler.compile(sources, ""), nil}
+            compiler.compile(sources, "")
           end
         end
         reply_channel.send(reply)
       rescue e : Exception
-        reply_channel.send({e, nil})
+        reply_channel.send(e)
       ensure
         dev_null.try &.close
         kill_thread.send nil
       end
       kill_thread.receive
     end
-    result, errors = reply_channel.receive
+    result = reply_channel.receive
 
     raise result if result.is_a? Exception
 
@@ -63,7 +67,7 @@ module Crystalline::Analysis
       diagnostics.try &.init_value("file://#{path}")
     }
 
-    errors.try &.each do |e|
+    result.program.error_stack.try &.each do |e|
       if e.is_a?(Crystal::TypeException) || e.is_a?(Crystal::SyntaxException)
         diagnostics.append_from_exception(e) unless ignore_diagnostics
       end
@@ -75,7 +79,7 @@ module Crystalline::Analysis
       LSP::Log.debug(exception: e) { "#{e}" }
       diagnostics.try &.append_from_exception(e) unless ignore_diagnostics
     else
-      LSP::Log.debug(exception: e) { "#{e}\n#{e.backtrace?}" }
+      LSP::Log.debug(exception: e) { "#{e.message}\n#{e.backtrace?}" }
     end
     nil
   ensure

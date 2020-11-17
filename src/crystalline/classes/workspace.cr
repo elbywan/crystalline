@@ -241,7 +241,7 @@ class Crystalline::Workspace
 
       # LSP::Log.info { "Node at cursor: #{n}" }
       # LSP::Log.info { "Node class: #{n.class}" }
-      # LSP::Log.info { "Node expansion: #{n.expanded if n.responds_to? :expan}" }
+      # LSP::Log.info { "Node expansion: #{n.expanded if n.responds_to? :expanded}" }
       # LSP::Log.info { "Node type: #{n.try &.type?}" }
       # LSP::Log.info { "Node type class: #{n.try &.type?.try &.class}" }
       # LSP::Log.info { "Nodes classes: #{nodes.map &.class}" }

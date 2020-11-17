@@ -89,15 +89,27 @@ module Crystal
 
   class Compiler
     # Will not raise if the semantic analysis fails.
-    def permissive_compile(source : Source | Array(Source), output_filename : String) : {Result, Array(Crystal::Exception)}
+    def permissive_compile(source : Source | Array(Source), output_filename : String) : Result
       source = [source] unless source.is_a?(Array)
       program = new_program(source)
-      program.permissive = true
-      program.error_stack.clear
       node = parse program, source
-      node, errors = program.permissive_semantic node, cleanup: !no_cleanup?
-      {Result.new(program, node), errors}
+      node = program.permissive_semantic node, cleanup: !no_cleanup?
+      Result.new(program, node)
     end
+
+    # def permissive_top_level_semantic(source : Source | Array(Source)) : {Result, Array(Crystal::Exception)}
+    #   source = [source] unless source.is_a?(Array)
+    #   program = new_program(source)
+    #   program.permissive = true
+    #   program.error_stack.clear
+    #   node = parse program, source
+    #   begin
+    #     node, _ = program.top_level_semantic(node)
+    #   rescue e : Crystal::Exception
+    #     program.error_stack << e
+    #   end
+    #   {Result.new(program, node), program.error_stack.to_a}
+    # end
   end
 
   class Program
@@ -105,8 +117,11 @@ module Crystal
     getter error_stack = Set(Crystal::Exception).new
 
     # Will not raise if the semantic analysis fails.
-    def permissive_semantic(node : ASTNode, cleanup = true) : {ASTNode, Array(Crystal::Exception)}
+    def permissive_semantic(node : ASTNode, cleanup = true) : ASTNode
+      permissive = false
       node, processor = top_level_semantic(node)
+      permissive = true
+      error_stack.clear
 
       begin
         @progress_tracker.stage("Semantic (ivars initializers)") do
@@ -138,11 +153,15 @@ module Crystal
 
         {result, self.error_stack.to_a}
       rescue e : Crystal::Exception
+        program.error_stack << e
         # Returns a partially typed ast.
-        {node, [e]}
+        node
       rescue
-        {node, [] of Crystal::Exception}
+        # Returns a partially typed ast.
+        node
       end
+
+      node
     end
   end
 
@@ -179,15 +198,17 @@ module Crystal
         visitor.end_visit_any self
       end
     rescue e : Crystal::Exception
-      if visitor.responds_to? :program && visitor.program.permissive
+      if !visitor.is_a?(Crystal::TopLevelVisitor) && visitor.responds_to? :program && visitor.program.permissive
         visitor.program.error_stack << e
       else
-        raise e.message
+        ::raise e
       end
     end
   end
 
   class MacroInterpreter < Visitor
+    getter program : Crystal::Program
+
     def visit(node : MacroExpression)
       previous_def.tap {
         node.expanded = @last
