@@ -19,12 +19,10 @@ class Crystalline::Diagnostics
   end
 
   def append_from_exception(error : Crystal::ErrorFormat)
-    bottom_error : Crystal::ErrorFormat = error
+    error_stack = Deque(Crystal::ErrorFormat).new
 
     loop do
-      if error.is_a? Crystal::ErrorFormat
-        bottom_error = error
-      end
+      error_stack << error if error.is_a? Crystal::ErrorFormat
       if error.responds_to? :inner
         break unless (error = error.inner)
       else
@@ -32,8 +30,10 @@ class Crystalline::Diagnostics
       end
     end
 
-    bottom_error.tap { |err|
-      err = err.as(Crystal::ErrorFormat)
+    related_information = [] of LSP::DiagnosticRelatedInformation
+
+    error_stack.each_with_index { |err, i|
+      bottom_error = i == error_stack.size - 1
       if err.filename.is_a? Crystal::VirtualFile && (expanded_source = err.filename.as(Crystal::VirtualFile).expanded_location)
         line = expanded_source.line_number || 1
         column = expanded_source.column_number
@@ -41,13 +41,25 @@ class Crystalline::Diagnostics
         line = err.line_number || 1
         column = err.column_number
       end
-      self.append(LSP::Diagnostic.new(
-        line: line,
-        column: column,
-        size: err.size || 0,
-        message: err.message || "Unknown error.",
-        source: err.true_filename
-      ))
+
+      if bottom_error
+        self.append(LSP::Diagnostic.new(
+          line: line,
+          column: column,
+          size: err.size || 0,
+          message: err.message || "Unknown error.",
+          source: err.true_filename,
+          related_information: related_information.reverse
+        ))
+      else
+        related_information << LSP::DiagnosticRelatedInformation.new(
+          line: line,
+          column: column,
+          size: err.size || 0,
+          message: err.message || "Unknown error.",
+          filename: err.true_filename,
+        )
+      end
     }
   end
 

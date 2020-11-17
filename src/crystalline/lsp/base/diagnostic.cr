@@ -34,6 +34,19 @@ module LSP
     property location : Location
     # The message of this related diagnostic information.
     property message : String
+
+    def initialize(line : Int32?, column : Int32?, size : Int32?, @message, filename)
+      line = line || 0
+      size = size || 1
+      range = Range.new(
+        start: Position.new(line: line - 1, character: column - 1),
+        end: Position.new(line: line - 1, character: column + size - 1),
+      )
+      @location = LSP::Location.new(
+        uri: "file://#{filename}",
+        range: range
+      )
+    end
   end
 
   # Represents a diagnostic, such as a compiler error or warning.
@@ -63,7 +76,7 @@ module LSP
     @[JSON::Field(key: "relatedInformation")]
     property related_information : Array(DiagnosticRelatedInformation)?
 
-    def initialize(line : Int32?, column : Int32?, size : Int32?, @message, @source)
+    def initialize(line : Int32?, column : Int32?, size : Int32?, @message, @source, @related_information = nil)
       line = line || 0
       size = size || 1
       @range = Range.new(
