@@ -5,7 +5,7 @@ require "./submodule_visitor"
 
 module Crystalline::Analysis
   # Compile a target *file_uri*.
-  def self.compile(server : LSP::Server, file_uri : URI, *, file_overrides : Hash(String, String)? = nil, ignore_diagnostics = false, wants_doc = false, permissive = true, top_level = false)
+  def self.compile(server : LSP::Server, file_uri : URI, *, file_overrides : Hash(String, String)? = nil, ignore_diagnostics = false, wants_doc = false, fail_fast = false, top_level = false)
     if file_uri.scheme == "file"
       file = File.new file_uri.decoded_path
       sources = [
@@ -17,7 +17,7 @@ module Crystalline::Analysis
   end
 
   # Compile an array of *sources*.
-  def self.compile(server : LSP::Server, sources : Array(Crystal::Compiler::Source), *, file_overrides : Hash(String, String)? = nil, ignore_diagnostics = false, wants_doc = false, permissive = true, top_level = false)
+  def self.compile(server : LSP::Server, sources : Array(Crystal::Compiler::Source), *, file_overrides : Hash(String, String)? = nil, ignore_diagnostics = false, wants_doc = false, fail_fast = false, top_level = false)
     diagnostics = Diagnostics.new
     reply_channel = Channel(Crystal::Compiler::Result | Exception).new
 
@@ -37,17 +37,13 @@ module Crystalline::Analysis
         reply = begin
           if top_level
             # Top level only.
-            # if permissive
-            #   compiler.permissive_top_level_semantic(sources)
-            # else
             compiler.top_level_semantic(sources)
-            # end
-          elsif permissive
-            # Permissive means that errors are collected instead of throwing during the semantic phase, and we still get a partially typed AST back.
-            compiler.permissive_compile(sources, "")
-          else
+          elsif fail_fast
             # Regular parser + semantic analysis phases.
             compiler.compile(sources, "")
+          else
+            # Fail-slow means that errors are collected instead of throwing during the semantic phase, and we still get a partially typed AST back.
+            compiler.fail_slow_compile(sources, "")
           end
         end
         reply_channel.send(reply)

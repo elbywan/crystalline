@@ -113,7 +113,7 @@ class Crystalline::Workspace
   class_getter compilation_lock = Mutex.new
 
   # Use the crystal compiler to typecheck the program.
-  def compile(server : LSP::Server, file_uri : URI? = nil, *, in_memory = false, ignore_diagnostics = false, wants_doc = false, text_overrides = nil, permissive = true, top_level = false, discard_nil_cached_result = false)
+  def compile(server : LSP::Server, file_uri : URI? = nil, *, in_memory = false, ignore_diagnostics = false, wants_doc = false, text_overrides = nil, fail_fast = false, top_level = false, discard_nil_cached_result = false)
     # We need a target.
     return nil unless file_uri || entry_point?
 
@@ -404,7 +404,7 @@ class Crystalline::Workspace
       column_number: position.character - left_offset
     )
 
-    # Trigger a "permissive" compilation.
+    # Trigger a compilation that will not fail fast.
     result = self.compile(server, file_uri, in_memory: true, ignore_diagnostics: true, wants_doc: true, text_overrides: text_overrides, discard_nil_cached_result: true)
     return unless result
 

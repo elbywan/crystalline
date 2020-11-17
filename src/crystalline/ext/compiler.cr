@@ -89,38 +89,23 @@ module Crystal
 
   class Compiler
     # Will not raise if the semantic analysis fails.
-    def permissive_compile(source : Source | Array(Source), output_filename : String) : Result
+    def fail_slow_compile(source : Source | Array(Source), output_filename : String) : Result
       source = [source] unless source.is_a?(Array)
       program = new_program(source)
       node = parse program, source
-      node = program.permissive_semantic node, cleanup: !no_cleanup?
+      node = program.fail_slow_semantic node, cleanup: !no_cleanup?
       Result.new(program, node)
     end
-
-    # def permissive_top_level_semantic(source : Source | Array(Source)) : {Result, Array(Crystal::Exception)}
-    #   source = [source] unless source.is_a?(Array)
-    #   program = new_program(source)
-    #   program.permissive = true
-    #   program.error_stack.clear
-    #   node = parse program, source
-    #   begin
-    #     node, _ = program.top_level_semantic(node)
-    #   rescue e : Crystal::Exception
-    #     program.error_stack << e
-    #   end
-    #   {Result.new(program, node), program.error_stack.to_a}
-    # end
   end
 
   class Program
-    property permissive = false
+    property fail_slow = false
     getter error_stack = Set(Crystal::Exception).new
 
     # Will not raise if the semantic analysis fails.
-    def permissive_semantic(node : ASTNode, cleanup = true) : ASTNode
-      permissive = false
+    def fail_slow_semantic(node : ASTNode, cleanup = true) : ASTNode
       node, processor = top_level_semantic(node)
-      permissive = true
+      fail_slow = true
       error_stack.clear
 
       begin
@@ -198,7 +183,7 @@ module Crystal
         visitor.end_visit_any self
       end
     rescue e : Crystal::Exception
-      if !visitor.is_a?(Crystal::TopLevelVisitor) && visitor.responds_to? :program && visitor.program.permissive
+      if !visitor.is_a?(Crystal::TopLevelVisitor) && visitor.responds_to? :program && visitor.program.fail_slow
         visitor.program.error_stack << e
       else
         ::raise e
