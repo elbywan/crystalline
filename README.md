@@ -27,6 +27,12 @@
 
 #### Latest Release
 
+##### ArchLinux
+
+```sh
+yay -S crystalline
+```
+
 ##### Linux
 
 ```sh
