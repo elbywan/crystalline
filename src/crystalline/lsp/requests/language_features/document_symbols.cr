@@ -55,6 +55,31 @@ module LSP
 
     # Children of this symbol, e.g. properties of a class.
     property children : Array(DocumentSymbol)?
+
+    def to_symbol_information_array(uri : String)
+      results = [] of LSP::SymbolInformation
+      deque = Deque(Tuple(LSP::DocumentSymbol, LSP::DocumentSymbol?)){ {self, nil} }
+
+      loop do
+        break if deque.size == 0
+        symbol, parent = deque.shift
+        results << LSP::SymbolInformation.new(
+          name: symbol.name,
+          kind: symbol.kind,
+          deprecated: symbol.deprecated,
+          location: LSP::Location.new(
+            uri: uri,
+            range: symbol.range
+          ),
+          container_name: parent.try &.name
+        )
+        symbol.children.try { |children|
+          deque.concat(children.map { |c| {c, self} })
+        }
+      end
+
+      results
+    end
   end
 
   # Represents information about programming constructs like variables, classes,
@@ -67,7 +92,7 @@ module LSP
     property name : String
 
     # The kind of this symbol.
-    property kind : SymbolKind
+    property kind : LSP::SymbolKind
 
     # Indicates if this symbol is deprecated.
     property deprecated : Bool?

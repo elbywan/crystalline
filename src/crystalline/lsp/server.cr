@@ -20,6 +20,8 @@ class LSP::Server
   getter output : IO
   # The broadcasted server capabilites.
   getter server_capabilities : LSP::ServerCapabilities
+  # The lsp client capabilites.
+  getter! client_capabilities : LSP::ClientCapabilities
   # A list of requests that were sent to clients to keep track of the ID and kind.
   getter requests_sent : Hash(RequestMessage::RequestId, LSP::Message) = {} of RequestMessage::RequestId => LSP::Message
   # Incremental.
@@ -126,6 +128,7 @@ class LSP::Server
     loop do
       initialize_message = self.class.read(@input)
       if initialize_message.is_a? LSP::InitializeRequest
+        @client_capabilities = initialize_message.params.capabilities
         if controller.responds_to? :on_init
           init_result = controller.on_init(initialize_message.params)
         else
