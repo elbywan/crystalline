@@ -76,7 +76,15 @@ class Crystalline::Controller
     when LSP::DocumentSymbolsRequest
       @documents_lock.synchronize do
         file_uri = URI.parse message.params.text_document.uri
-        workspace.document_symbols(@server, file_uri)
+        document_symbols = workspace.document_symbols(@server, file_uri)
+
+        if @server.client_capabilities.text_document.try &.document_symbol.try &.hierarchical_document_symbol_support
+          document_symbols
+        else
+          document_symbols.try &.reduce([] of LSP::SymbolInformation) { |acc, document_symbol|
+            acc.concat(document_symbol.to_symbol_information_array(message.params.text_document.uri))
+          }
+        end
       end
     else
       nil
