@@ -8,12 +8,12 @@ module Crystalline
       range = Utils.lsp_range_from_node(@parent_macro_call || node)
       name = node.responds_to?(:name) ? node.name.to_s : node.to_s
       LSP::DocumentSymbol.new(
-        name:            name,
-        detail:          detail,
-        kind:            kind,
-        range:           range,
+        name: name,
+        detail: detail,
+        kind: kind,
+        range: range,
         selection_range: range,
-        children:        [] of LSP::DocumentSymbol,
+        children: [] of LSP::DocumentSymbol,
       )
     end
 

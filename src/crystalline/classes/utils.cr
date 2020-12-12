@@ -71,11 +71,11 @@ module Crystalline::Utils
     end_location = node.end_location || start_location
     LSP::Range.new(
       start: LSP::Position.new(
-        line:      start_location.try(&.line_number.- 1) || 0,
+        line: start_location.try(&.line_number.- 1) || 0,
         character: start_location.try(&.column_number.- 1) || 0,
       ),
       end: LSP::Position.new(
-        line:      end_location.try(&.line_number.- 1) || 0,
+        line: end_location.try(&.line_number.- 1) || 0,
         character: end_location.try(&.column_number.- 1) || 0,
       ),
     )
