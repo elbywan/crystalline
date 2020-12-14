@@ -59,13 +59,13 @@ module Crystalline::Analysis
 
     raise result if result.is_a? Exception
 
-    result.program.requires.each { |path|
-      diagnostics.try &.init_value("file://#{path}")
-    }
+    if !ignore_diagnostics
+      result.program.requires.each do |path|
+        diagnostics.try &.init_value("file://#{path}")
+      end
 
-    result.program.error_stack.try &.each do |e|
-      if e.is_a?(Crystal::TypeException) || e.is_a?(Crystal::SyntaxException)
-        diagnostics.append_from_exception(e) unless ignore_diagnostics
+      result.program.error_stack.try &.each do |e|
+        diagnostics.append_from_exception(e) if e.is_a?(Crystal::TypeException) || e.is_a?(Crystal::SyntaxException)
       end
     end
 

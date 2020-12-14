@@ -75,4 +75,9 @@ struct LSP::ClientCapabilities
 
   # Experimental client capabilities.
   property experimental : JSON::Any?
+
+  def ignore_diagnostics? : Bool
+    text_document = @text_document
+    text_document.nil? || text_document.publish_diagnostics.nil?
+  end
 end
