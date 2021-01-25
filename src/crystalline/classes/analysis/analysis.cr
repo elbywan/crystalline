@@ -59,9 +59,9 @@ module Crystalline::Analysis
 
     raise result if result.is_a? Exception
 
-    if !ignore_diagnostics
+    unless ignore_diagnostics
       result.program.requires.each do |path|
-        diagnostics.try &.init_value("file://#{path}")
+        diagnostics.init_value("file://#{path}")
       end
 
       result.program.error_stack.try &.each do |e|
