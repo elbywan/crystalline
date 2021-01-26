@@ -20,7 +20,7 @@ class Crystalline::Controller
   def when_ready : Nil
     # Compile the workspace at once.
     spawn same_thread: true do
-      workspace.compile(@server)
+      workspace.compile(@server, ignore_diagnostics: @server.client_capabilities.ignore_diagnostics?)
     end
   end
 

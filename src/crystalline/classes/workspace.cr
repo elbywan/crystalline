@@ -71,7 +71,9 @@ class Crystalline::Workspace
     @result_cache.invalidate(file_uri)
     # spawn is needed because we are inside a lock
     # and compilation should not prevent unlocking the mutex
-    spawn self.compile(server, URI.parse(file_uri), discard_nil_cached_result: true)
+    spawn self.compile(server, URI.parse(file_uri),
+      discard_nil_cached_result: true,
+      ignore_diagnostics: server.client_capabilities.ignore_diagnostics?)
   end
 
   def format_document(params : LSP::DocumentFormattingParams) : {String, TextDocument}?
