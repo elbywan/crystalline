@@ -27,24 +27,24 @@
 
 #### Latest Release
 
-##### ArchLinux
+##### Linux (x86_64)
+
+```sh
+wget https://github.com/elbywan/crystalline/releases/latest/download/crystalline_x86_64-unknown-linux-gnu.gz -O crystalline.gz &&\
+gzip -d crystalline.gz &&\
+chmod u+x crystalline
+```
+
+###### ArchLinux
 
 ```sh
 yay -S crystalline
 ```
 
-##### Linux
+##### MacOS (x86_64)
 
 ```sh
-wget https://github.com/elbywan/crystalline/releases/latest/download/crystalline_linux.gz -O crystalline.gz &&\
-gzip -d crystalline.gz &&\
-chmod u+x crystalline
-```
-
-##### MacOS
-
-```sh
-curl -L https://github.com/elbywan/crystalline/releases/latest/download/crystalline_darwin.gz -o crystalline.gz &&\
+curl -L https://github.com/elbywan/crystalline/releases/latest/download/crystalline_x86_64-apple-darwin.gz -o crystalline.gz &&\
 gzip -d crystalline.gz &&\
 chmod u+x crystalline
 ```
@@ -278,6 +278,7 @@ Debug logs are deactivated by default, uncomment this line in `src/crystalline/l
 
 #### Why the name `crystalline`?
 
-Aside of the obvious reasons (crystal-lang), `cristaline` is a famous bottled water brand in France.
+Aside of the obvious reasons (crystal-lang), `cristaline` is a famous bottled water brand in France that published silly TV commercials.
+It is pronounced the same as `crystalline`.
 
 ![guy roux](assets/guyroux.gif)

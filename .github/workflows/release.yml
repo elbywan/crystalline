@@ -3,29 +3,29 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   macos:
     runs-on: macos-latest
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
-    - name: Install Crystal
-      run: brew install openssl crystal && brew uninstall --ignore-dependencies llvm && brew install llvm@9
-    - name: Install dependencies
-      run: shards install --production
-    - name: Build the binary
-      env:
-        LLVM_CONFIG: /usr/local/opt/llvm@9/bin/llvm-config
-      run: |
-        ln -s /usr/lib/libxml2.2.dylib /usr/local/lib/liblibxml2.tbd.dylib
-        shards build crystalline --release --no-debug -Dpreview_mt --stats --progress
-    - name: Upload a Build Artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: crystalline_darwin
-        path: ./bin/crystalline
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Install Crystal
+        run: brew install openssl crystal && brew uninstall --ignore-dependencies llvm && brew install llvm@9
+      - name: Install dependencies
+        run: shards install --production
+      - name: Build the binary
+        env:
+          LLVM_CONFIG: /usr/local/opt/llvm@9/bin/llvm-config
+        run: |
+          ln -s /usr/lib/libxml2.2.dylib /usr/local/lib/liblibxml2.tbd.dylib
+          shards build crystalline --release --no-debug -Dpreview_mt --stats --progress
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: crystalline_x86_64-apple-darwin
+          path: ./bin/crystalline
   linux:
     runs-on: ubuntu-latest
     steps:
@@ -39,7 +39,7 @@ jobs:
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v2
         with:
-          name: crystalline_linux
+          name: crystalline_x86_64-unknown-linux-gnu
           path: ./crystalline
   release:
     needs: [macos, linux]
@@ -67,8 +67,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./artifacts/crystalline_linux/crystalline.gz
-          asset_name: crystalline_linux.gz
+          asset_path: ./artifacts/crystalline_x86_64-unknown-linux-gnu/crystalline.gz
+          asset_name: crystalline_x86_64-unknown-linux-gnu.gz
           asset_content_type: application/gzip
       - name: Attach macOS binary
         uses: actions/upload-release-asset@v1
@@ -76,7 +76,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./artifacts/crystalline_darwin/crystalline.gz
-          asset_name: crystalline_darwin.gz
+          asset_path: ./artifacts/crystalline_x86_64-apple-darwin/crystalline.gz
+          asset_name: crystalline_x86_64-apple-darwin.gz
           asset_content_type: application/gzip
-
