@@ -80,7 +80,7 @@ module Crystal
       end
 
       node.raise "#{message}\n\n#{notes.join("\n")}"
-    rescue ex : Crystal::Exception
+    rescue ex : Crystal::CodeError
       node.raise "while requiring \"#{node.string}\"", ex
     rescue ex
       raise ::Exception.new("while requiring \"#{node.string}\"", ex)
@@ -100,7 +100,7 @@ module Crystal
 
   class Program
     property fail_slow = false
-    getter error_stack = Set(Crystal::Exception).new
+    getter error_stack = Set(Crystal::CodeError).new
 
     # Will not raise if the semantic analysis fails.
     def fail_slow_semantic(node : ASTNode, cleanup = true) : ASTNode
@@ -137,7 +137,7 @@ module Crystal
         end
 
         {result, self.error_stack.to_a}
-      rescue e : Crystal::Exception
+      rescue e : Crystal::CodeError
         program.error_stack << e
         # Returns a partially typed ast.
         node
@@ -182,7 +182,7 @@ module Crystal
         visitor.end_visit self
         visitor.end_visit_any self
       end
-    rescue e : Crystal::Exception
+    rescue e : Crystal::CodeError
       if !visitor.is_a?(Crystal::TopLevelVisitor) && visitor.responds_to? :program && visitor.program.fail_slow
         visitor.program.error_stack << e
       else

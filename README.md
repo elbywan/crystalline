@@ -23,6 +23,13 @@
 
 *Recommended method is to download and use pre-built binaries when possible. Building from source does take a long time.*
 
+### Compatibility
+
+Crystal     | Crystalline
+------------|------------
+**0.36.0**  | **0.2.X (latest)**
+0.35.1      | 0.1.X
+
 ### Pre-built binaries
 
 #### Latest Release
@@ -48,6 +55,10 @@ curl -L https://github.com/elbywan/crystalline/releases/latest/download/crystall
 gzip -d crystalline.gz &&\
 chmod u+x crystalline
 ```
+
+#### Specific release
+
+[See the releases page.](https://github.com/elbywan/crystalline/releases)
 
 #### Specific commit
 

@@ -12,7 +12,7 @@ module LSP
       message_type = case entry.severity
                      when ::Log::Severity::Info
                        LSP::MessageType::Info
-                     when ::Log::Severity::Warning
+                     when ::Log::Severity::Warn
                        LSP::MessageType::Warning
                      when ::Log::Severity::Error, ::Log::Severity::Fatal
                        LSP::MessageType::Error
