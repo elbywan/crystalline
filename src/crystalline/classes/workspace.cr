@@ -69,11 +69,6 @@ class Crystalline::Workspace
   def save_document(server : LSP::Server, params : LSP::DidSaveTextDocumentParams)
     file_uri = params.text_document.uri
     @result_cache.invalidate(file_uri)
-    # spawn is needed because we are inside a lock
-    # and compilation should not prevent unlocking the mutex
-    spawn self.compile(server, URI.parse(file_uri),
-      discard_nil_cached_result: true,
-      ignore_diagnostics: server.client_capabilities.ignore_diagnostics?)
   end
 
   def format_document(params : LSP::DocumentFormattingParams) : {String, TextDocument}?
@@ -200,7 +195,7 @@ class Crystalline::Workspace
       select
       when result = sync_channel.receive
         result
-      # Just in case…
+        # Just in case…
       when timeout 60.seconds
         nil
       end

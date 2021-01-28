@@ -117,6 +117,14 @@ class Crystalline::Controller
       @documents_lock.synchronize {
         workspace.save_document(@server, message.params)
       }
+      @compiler_lock.synchronize {
+        file_uri = message.params.text_document.uri
+        workspace.compile(
+          @server,
+          URI.parse(file_uri),
+          discard_nil_cached_result: true,
+          ignore_diagnostics: @server.client_capabilities.ignore_diagnostics?)
+      }
     when LSP::CancelNotification
       @pending_requests.delete message.params.id
     end
