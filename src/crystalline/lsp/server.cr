@@ -164,9 +164,9 @@ class LSP::Server
       # Read a message.
       message = self.class.read(@input)
 
+      exit(0) if message.is_a? LSP::ExitNotification
       # Perform special actions if needed.
       raise LSP::Exception.new(code: :invalid_request, message: "Server is shutting down.") if @shutdown
-      exit(0) if message.is_a? LSP::ExitNotification
 
       if message.is_a? LSP::ShutdownRequest
         @shutdown = true
@@ -174,7 +174,7 @@ class LSP::Server
       else
         delegate(controller, message)
       end
-    rescue IO::Error
+    rescue error : IO::Error
       # Break on IO error because the connection is certainly closed.
       # In this case, just terminate the loop.
       break
