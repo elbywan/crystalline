@@ -20,7 +20,7 @@ class Crystalline::Controller
   def when_ready : Nil
     # Compile the workspace at once.
     spawn same_thread: true do
-      workspace.compile(@server, ignore_diagnostics: @server.client_capabilities.ignore_diagnostics?)
+      workspace.compile(@server)
     end
   end
 
@@ -123,7 +123,7 @@ class Crystalline::Controller
           @server,
           URI.parse(file_uri),
           discard_nil_cached_result: true,
-          ignore_diagnostics: @server.client_capabilities.ignore_diagnostics?)
+        )
       }
     when LSP::CancelNotification
       @pending_requests.delete message.params.id
