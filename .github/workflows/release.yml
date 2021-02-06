@@ -16,6 +16,8 @@ jobs:
       - name: Install dependencies
         run: shards install --production
       - name: Build the binary
+        env:
+          LLVM_CONFIG: /usr/local/opt/llvm/bin/llvm-config
         run: shards build crystalline --release --no-debug -Dpreview_mt --stats --progress
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v2
