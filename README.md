@@ -27,7 +27,7 @@
 
 Crystal     | Crystalline
 ------------|------------
-**0.36.0**  | **0.2.X (latest)**
+**0.36.X**  | **0.2.X (latest)**
 0.35.1      | 0.1.X
 
 ### Pre-built binaries
