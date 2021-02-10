@@ -11,7 +11,7 @@
 
 **`Crystalline` is an implementation of the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) written in and for the [Crystal Language](https://crystal-lang.org/). It aims to provide limited language features (like go-to, autocompletion, syntax and semantic checking) and ease development with any compatible code editor.**
 
-**Status: in development.**
+**Status: development is halted until [this bug](https://github.com/crystal-lang/crystal/issues/10359) in the Crystal compiler gets fixed.**
 
 <hr/>
 
