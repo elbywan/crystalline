@@ -59,4 +59,4 @@ RUN g++ -c /usr/share/crystal/src/llvm/ext/llvm_ext.cc -I/usr/lib/llvm10/include
 
 # Build crystalline.
 COPY . /app/
-RUN shards build crystalline --no-debug --progress --stats --production --static --release -Dpreview_mt
+RUN shards build crystalline --no-debug --progress --stats --production --static --release -Dpreview_mt --ignore-crystal-version
