@@ -17,13 +17,11 @@ jobs:
       - name: Install Crystal
         run: brew update && brew install openssl crystal && brew uninstall --ignore-dependencies llvm && brew install llvm@9
       - name: Install dependencies
-        run: shards install --production
+        run: shards install --production --ignore-crystal-version
       - name: Build the binary
         env:
           LLVM_CONFIG: /usr/local/opt/llvm@9/bin/llvm-config
-        run: |
-          ln -s /usr/lib/libxml2.2.dylib /usr/local/lib/liblibxml2.tbd.dylib
-          shards build crystalline --release --no-debug -Dpreview_mt --stats --progress
+        run: shards build crystalline --release --no-debug -Dpreview_mt --stats --progress --ignore-crystal-version
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v2
         with:

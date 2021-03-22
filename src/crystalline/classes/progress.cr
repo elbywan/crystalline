@@ -28,7 +28,7 @@ class Crystalline::Progress
     server.send(create_request)
   end
 
-  private def report_callback(server, &cb : Proc(String?))
+  def send_progress_start(server)
     server.send(LSP::ProgressNotification.new(
       params: LSP::ProgressParams.new(
         token: @token,
@@ -38,8 +38,9 @@ class Crystalline::Progress
         ),
       ),
     ))
-    end_message = cb.call
-  ensure
+  end
+
+  def send_progress_end(server, end_message = nil)
     server.send(LSP::ProgressNotification.new(
       params: LSP::ProgressParams.new(
         token: @token,
@@ -48,5 +49,12 @@ class Crystalline::Progress
         ),
       ),
     ))
+  end
+
+  private def report_callback(server, &cb : Proc(String?))
+    send_progress_start(server)
+    end_message = cb.call
+  ensure
+    send_progress_end(server, end_message)
   end
 end

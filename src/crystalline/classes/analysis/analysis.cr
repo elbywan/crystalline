@@ -23,7 +23,7 @@ module Crystalline::Analysis
 
     # Delegate heavy processing to a separate thread.
     Thread.new do
-      kill_thread = Channel(Nil).new
+      wait_before_termination = Channel(Nil).new
       spawn same_thread: true do
         dev_null = File.open(File::NULL, "w")
         compiler = Crystal::Compiler.new
@@ -51,9 +51,9 @@ module Crystalline::Analysis
         reply_channel.send(e)
       ensure
         dev_null.try &.close
-        kill_thread.send nil
+        wait_before_termination.send nil
       end
-      kill_thread.receive
+      wait_before_termination.receive
     end
     result = reply_channel.receive
 

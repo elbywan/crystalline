@@ -12,10 +12,11 @@ class Crystalline::Diagnostics
     @diagnostics[key] << diagnostic
   end
 
-  def init_value(key : String)
+  def init_value(key : String) : self
     unless @diagnostics.has_key?(key)
       @diagnostics[key] = [] of LSP::Diagnostic
     end
+    self
   end
 
   def append_from_exception(error : Crystal::ErrorFormat)

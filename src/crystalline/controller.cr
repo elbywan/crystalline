@@ -111,7 +111,7 @@ class Crystalline::Controller
       }
     when LSP::DidCloseNotification
       @documents_lock.synchronize {
-        workspace.close_document(message.params)
+        workspace.close_document(@server, message.params)
       }
     when LSP::DidSaveNotification
       @documents_lock.synchronize {

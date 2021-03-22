@@ -15,7 +15,7 @@ class Crystalline::Workspace
   # The dependencies of the workspace, meaning the list of files required by the compilation target (entry point).
   getter dependencies : Set(String) = Set(String).new
   # Determines the workspace entry point.
-  getter? entry_point : URI do
+  getter? entry_point : URI? do
     root_uri.try { |uri|
       path = Path[uri.decoded_path, "shard.yml"]
       shards_yaml = File.open(path) do |file|
@@ -62,8 +62,11 @@ class Crystalline::Workspace
     # spawn self.compile(server, URI.parse(file_uri), in_memory: true )
   end
 
-  def close_document(params : LSP::DidCloseTextDocumentParams)
+  def close_document(server : LSP::Server, params : LSP::DidCloseTextDocumentParams)
+    file_uri = params.text_document.uri
     @opened_documents.delete(params.text_document.uri)
+    @result_cache.invalidate(file_uri)
+    Diagnostics.new.init_value(file_uri).publish(server) unless inside_workspace?(URI.parse file_uri)
   end
 
   def save_document(server : LSP::Server, params : LSP::DidSaveTextDocumentParams)
@@ -211,7 +214,8 @@ class Crystalline::Workspace
       when result = sync_channel.receive
         result
         # Just in case…
-      when timeout 60.seconds
+      when timeout 120.seconds
+        progress.send_progress_end(server)
         nil
       end
     end
