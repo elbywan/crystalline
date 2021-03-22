@@ -35,7 +35,7 @@ RUN apk del -r --purge autoconf automake libtool
 
 # Download and install crystal.
 RUN \
-  wget -O /tmp/crystal.tar.gz https://github.com/crystal-lang/crystal/releases/download/0.36.1/crystal-0.36.1-1-linux-x86_64.tar.gz &&\
+  wget -O /tmp/crystal.tar.gz https://github.com/crystal-lang/crystal/releases/download/1.0.0/crystal-1.0.0-1-linux-x86_64.tar.gz &&\
   tar -xz -C /usr --strip-component=1  -f /tmp/crystal.tar.gz \
   --exclude */lib/crystal/lib \
   --exclude */share/crystal/src/llvm/ext/llvm_ext.o \

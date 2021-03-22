@@ -3,5 +3,5 @@
 /bin/
 /.shards/
 *.dwarf
-/test*.cr
+/test*
 .vscode

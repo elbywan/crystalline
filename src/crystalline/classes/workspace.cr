@@ -15,7 +15,7 @@ class Crystalline::Workspace
   # The dependencies of the workspace, meaning the list of files required by the compilation target (entry point).
   getter dependencies : Set(String) = Set(String).new
   # Determines the workspace entry point.
-  getter? entry_point : URI do
+  getter? entry_point : URI? do
     root_uri.try { |uri|
       path = Path[uri.decoded_path, "shard.yml"]
       shards_yaml = File.open(path) do |file|

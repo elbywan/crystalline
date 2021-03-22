@@ -11,7 +11,7 @@
 
 **`Crystalline` is an implementation of the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) written in and for the [Crystal Language](https://crystal-lang.org/). It aims to provide limited language features (like go-to, autocompletion, syntax and semantic checking) and ease development with any compatible code editor.**
 
-**Status: development is halted until [this bug](https://github.com/crystal-lang/crystal/issues/10359) in the Crystal compiler gets fixed.**
+**Status: in development.**
 
 <hr/>
 
@@ -27,7 +27,8 @@
 
 Crystal     | Crystalline
 ------------|------------
-**0.36.X**  | **0.2.X (latest)**
+**1.0.X**   | **0.3.X (latest)**
+0.36.X      | 0.2.X
 0.35.1      | 0.1.X
 
 ### Pre-built binaries

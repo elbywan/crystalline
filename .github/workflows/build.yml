@@ -17,7 +17,7 @@ jobs:
       - name: Install Crystal
         run: brew update && brew install openssl crystal
       - name: Install dependencies
-        run: shards install --production
+        run: shards install --production --ignore-crystal-version
       - name: Build the binary
         env:
           LLVM_CONFIG: /usr/local/opt/llvm/bin/llvm-config
