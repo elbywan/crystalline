@@ -2,6 +2,7 @@ require "uri"
 require "yaml"
 require "./text_document"
 require "./progress"
+require "./project"
 require "./result_cache"
 require "./analysis/*"
 
@@ -12,38 +13,20 @@ class Crystalline::Workspace
   getter root_uri : URI?
   # A list of documents that are openened in the text editor.
   getter opened_documents = {} of String => TextDocument
-  # The dependencies of the workspace, meaning the list of files required by the compilation target (entry point).
-  getter dependencies : Set(String) = Set(String).new
-  # Determines the workspace entry point.
-  getter? entry_point : URI? do
-    root_uri.try { |uri|
-      path = Path[uri.decoded_path, "shard.yml"]
-      shards_yaml = File.open(path) do |file|
-        YAML.parse(file)
-      end
-      shard_name = shards_yaml["name"].as_s
-      # If shard.yml has the `crystalline/main` key, use that.
-      relative_main = shards_yaml.dig?("crystalline", "main").try &.as_s
-      # Else if shard.yml has a `targets/[shard name]/main` key, use that.
-      relative_main ||= shards_yaml.dig?("targets", shard_name, "main").try &.as_s
-      if relative_main && File.exists? relative_main
-        main_path = Path[uri.decoded_path, relative_main]
-        # Add the entry point as a dependency to itself.
-        dependencies << main_path.to_s
-        URI.parse("file://#{main_path}")
-      end
-    }
-  rescue e
-    nil
-  end
+  # A list of projects in this workspace
+  getter projects = [] of Project
 
   def initialize(server : LSP::Server, root_uri : String?)
-    @root_uri = root_uri.try &->URI.parse(String)
+    if @root_uri = root_uri.try &->URI.parse(String)
+      @projects = Project.find_in_workspace_root @root_uri.not_nil!
+    end
   end
 
   def open_document(params : LSP::DidOpenTextDocumentParams)
     raw_uri = params.text_document.uri
-    document = TextDocument.new(raw_uri, params.text_document.text)
+    uri = URI.parse(raw_uri)
+    project = Project.best_fit_for_file(@projects, uri)
+    document = TextDocument.new(uri, project, params.text_document.text)
     @opened_documents[raw_uri] = document
   end
 
@@ -54,19 +37,20 @@ class Crystalline::Workspace
         {change.text, change.range}
       }
       document.update_contents(content_changes, version: params.text_document.version)
+
+      document.project?.try(&.entry_point?).try { |entry|
+        @result_cache.invalidate(entry.to_s)
+      }
     }
     @result_cache.invalidate(file_uri)
-    entry_point?.try { |entry|
-      @result_cache.invalidate(entry.to_s)
-    } if inside_workspace?(URI.parse file_uri)
     # spawn self.compile(server, URI.parse(file_uri), in_memory: true )
   end
 
   def close_document(server : LSP::Server, params : LSP::DidCloseTextDocumentParams)
     file_uri = params.text_document.uri
-    @opened_documents.delete(params.text_document.uri)
+    document = @opened_documents.delete(params.text_document.uri)
     @result_cache.invalidate(file_uri)
-    Diagnostics.new.init_value(file_uri).publish(server) unless inside_workspace?(URI.parse file_uri)
+    Diagnostics.new.init_value(file_uri).publish(server) unless document.try(&.project?)
   end
 
   def save_document(server : LSP::Server, params : LSP::DidSaveTextDocumentParams)
@@ -94,16 +78,13 @@ class Crystalline::Workspace
     # swallow exceptions silently
   end
 
-  private def inside_workspace?(file_uri : URI)
-    entry_point? && dependencies.size > 0 && file_uri.decoded_path.in?(dependencies)
-  end
-
   # Run a top level semantic analysis to compute dependencies.
-  def recalculate_dependencies(server)
-    return unless target = entry_point?
+  def recalculate_dependencies(server, project)
+    return unless target = project.entry_point?
 
-    Analysis.compile(server, target, ignore_diagnostics: true, wants_doc: false, top_level: true).try { |result|
-      @dependencies = result.program.requires
+    lib_path = project.default_lib_path
+    Analysis.compile(server, target, lib_path: lib_path, ignore_diagnostics: true, wants_doc: false, top_level: true).try { |result|
+      project.dependencies = result.program.requires
     }
   rescue
     nil
@@ -115,7 +96,7 @@ class Crystalline::Workspace
   # Use the crystal compiler to typecheck the program.
   def compile(
     server : LSP::Server,
-    file_uri : URI? = nil,
+    file_uri : URI,
     *,
     in_memory = false,
     ignore_diagnostics = server.client_capabilities.ignore_diagnostics?,
@@ -127,27 +108,27 @@ class Crystalline::Workspace
     top_level = false,
     discard_nil_cached_result = false
   )
-    # We need a target.
-    return nil unless file_uri || entry_point?
+    @projects.each do |project|
+      # If the project has less than 1 dependency, it could mean that the last
+      # dependency calculation failed (likely because of a syntax error). So we
+      # try again.
+      recalculate_dependencies(server, project) if project.dependencies.size < 2
+    end
 
-    # If the workspace entry point has less than 1 dependency, it could mean that the last dependency calculation failed (likely because of a syntax error).
-    # So we try again.
-    recalculate_dependencies(server) if dependencies.size < 2
-
-    if external_file = file_uri.try { |uri| !inside_workspace?(uri) }
-      # If the file is not a workspace dependency.
+    project = Project.best_fit_for_file(@projects, file_uri)
+    if project && (entry_point = project.entry_point?)
+      target = entry_point
+      progress = Progress.new(
+        token: "workspace/compile",
+        title: "Building project",
+        message: target.decoded_path
+      )
+    else
+      # The file is not a project dependency.
       target = file_uri.not_nil!
       progress = Progress.new(
         token: "workspace/compile",
         title: "Building",
-        message: target.decoded_path
-      )
-    else
-      # File is a dependency.
-      target = entry_point?.not_nil!
-      progress = Progress.new(
-        token: "workspace/compile",
-        title: "Building workspace",
         message: target.decoded_path
       )
     end
@@ -191,7 +172,9 @@ class Crystalline::Workspace
             file_overrides[file_path] = contents
           }
         end
-        result = Analysis.compile(server, sources || target, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, top_level: top_level)
+
+        lib_path = project.try(&.default_lib_path)
+        result = Analysis.compile(server, sources || target, lib_path: lib_path, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, top_level: top_level)
         # Store the result in the cache, unless a client event invalided the previous cache.
         # For instance if a compilation is running, but the user saved the document in the meantime (before completion)
         # then we discard the result because it is already outdated.
@@ -200,9 +183,9 @@ class Crystalline::Workspace
         end
 
         if result
-          unless external_file
-            # Store the workspace dependencies.
-            @dependencies = result.program.requires
+          if project.try(&.entry_point?)
+            # Store the project dependencies.
+            project.not_nil!.dependencies = result.program.requires
           end
           "Completed successfully."
         else
@@ -215,7 +198,7 @@ class Crystalline::Workspace
       select
       when result = sync_channel.receive
         result
-        # Just in case…
+      # Just in case…
       when timeout 120.seconds
         progress.send_progress_end(server)
         nil
