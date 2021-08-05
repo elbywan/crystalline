@@ -202,6 +202,18 @@ This can be extremely important to understand when you are writing a code librar
 require "./spec/**"
 ```
 
+### Multiple projects
+
+If you have multiple Crystal projects in a single folder (e.g. a monorepo), you can create a `.crystalline.yml` in the root, containing an array of paths to the individual Crystal projects:
+
+```yml
+projects:
+  - my_project_1
+  - my_project_2
+```
+
+Each of these projects should ideally contain the `shard.yml` containing the entry point as mentioned above. However, even if no shard.yml is present, `require`s will still be resolved relative to the project directory rather than the root directory.
+
 ## Features
 
 **Disclaimer: `Crystalline` is not as extensive in terms of features as other Language Servers but still provides very convenient tools.**
