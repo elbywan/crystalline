@@ -1,5 +1,3 @@
-require "compiler/crystal/**"
-
 module Crystalline
   class ResultCache
     # A monotonic timestamp used to store the invalidation date.

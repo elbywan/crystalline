@@ -1,4 +1,3 @@
-require "compiler/crystal/**"
 require "../diagnostics"
 require "./cursor_visitor"
 require "./submodule_visitor"

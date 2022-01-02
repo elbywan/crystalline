@@ -30,12 +30,12 @@ Building from source does take a long time._
 
 ### Compatibility
 
-| Crystal         | Crystalline        |
-| --------------- | ------------------ |
-| **1.1.X,1.2.X** | **master**         |
-| 1.0.X           | 0.3.X              |
-| 0.36.X          | 0.2.X              |
-| 0.35.1          | 0.1.X              |
+| Crystal         | Crystalline |
+| --------------- | ----------- |
+| **1.1.X,1.2.X** | **master**  |
+| 1.0.X           | 0.3.X       |
+| 0.36.X          | 0.2.X       |
+| 0.35.1          | 0.1.X       |
 
 ### Pre-built binaries
 
@@ -77,14 +77,6 @@ build.](https://github.com/elbywan/crystalline/actions)
 **Warning: this can take a long time! (several minutes - up to 20 minutes,
 depending on your hardware)**
 
-Make sure you clone a copy of the [Crystal sources](https://github.com/crystal-lang/crystal)
-corresponding to the version of the compiler you're running. For instance, for
-version 1.2.2, you'd have:
-
-```
-$ git clone https://github.com/crystal-lang/crystal -b 1.2.2
-```
-
 #### Scoped install
 
 In the `.shard.yml` file:
@@ -100,7 +92,7 @@ Then:
 
 ```sh
 # Produces a binary at ./bin/crystalline
-CRYSTAL_PATH=$PATH_TO_CRYSTAL_SOURCES/src shards build crystalline --release --no-debug --progress -Dpreview_mt
+shards build crystalline --release --no-debug --progress -Dpreview_mt
 ```
 
 #### Global install
@@ -109,7 +101,7 @@ CRYSTAL_PATH=$PATH_TO_CRYSTAL_SOURCES/src shards build crystalline --release --n
 git clone https://github.com/elbywan/crystalline
 cd crystalline
 mkdir bin
-CRYSTAL_PATH=$PATH_TO_CRYSTAL_SOURCES/src:lib crystal build ./src/crystalline.cr  -o ./bin/crystalline --release --no-debug --progress -Dpreview_mt
+crystal build ./src/crystalline.cr  -o ./bin/crystalline --release --no-debug --progress -Dpreview_mt
 ```
 
 #### Known Build Issues

@@ -1,4 +1,3 @@
-require "compiler/crystal/**"
 require "uri"
 require "yaml"
 require "./text_document"

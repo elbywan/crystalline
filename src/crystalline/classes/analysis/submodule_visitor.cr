@@ -1,5 +1,3 @@
-require "compiler/crystal/**"
-
 module Crystalline
   class SubModuleVisitor < Crystal::Visitor
     getter submodules : Array(Crystal::ModuleType)

@@ -1,5 +1,3 @@
-require "compiler/crystal/**"
-
 module Crystal
   class Compiler
     # Make it possible to compile in-memory.
