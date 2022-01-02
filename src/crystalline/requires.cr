@@ -1,0 +1,7 @@
+require "compiler/crystal/*"
+require "compiler/crystal/syntax/**"
+require "compiler/crystal/semantic/**"
+require "compiler/crystal/macros/**"
+require "compiler/crystal/codegen/**"
+require "compiler/crystal/tools/implementations"
+require "compiler/crystal/tools/context"

@@ -1,5 +1,3 @@
-require "compiler/crystal/**"
-
 module Crystalline
   class CursorVisitor < Crystal::Visitor
     include Crystal::TypedDefProcessor
