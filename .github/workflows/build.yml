@@ -15,11 +15,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
       - name: Install Crystal
-        run: brew update && brew install openssl crystal && brew uninstall --ignore-dependencies llvm && brew install llvm@11
+        run: brew update && brew install gcc make openssl crystal && brew uninstall --ignore-dependencies llvm && brew install llvm@11
       - name: Install dependencies
         run: shards install --production --ignore-crystal-version
+      - name: Download the Crystal sources
+        run: git clone -b 1.2.2 --depth=1 https://github.com/crystal-lang/crystal
+      - name: Build llvm_ext
+        env:
+          LLVM_CONFIG: /usr/local/opt/llvm@11/bin/llvm-config
+        run: make -C crystal llvm_ext
       - name: Build the binary
         env:
+          CRYSTAL_PATH: crystal/src:lib
           LLVM_CONFIG: /usr/local/opt/llvm@11/bin/llvm-config
         run: shards build crystalline --release --no-debug -Dpreview_mt --stats --progress --ignore-crystal-version
       - name: Upload a Build Artifact

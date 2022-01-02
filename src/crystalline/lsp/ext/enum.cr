@@ -13,7 +13,7 @@ struct Enum
         super
       end
 
-      def to_json(builder : JSON::Builder) : IO
+      def to_json(builder : JSON::Builder)
         builder.string self.to_s{% if downcase %}.downcase{% end %}
       end
 
