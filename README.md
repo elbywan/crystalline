@@ -191,6 +191,31 @@ Or just use a different LLVM major version until this issue is fixed upstream.
 - Reload the window by pressing CMD/CTRL + SHIFT + P and select
   `Developer: Reload Window` (or as an alternative, restart VSCode).
 
+#### Emacs
+
+- Download the `crystal-mode` [package](https://melpa.org/#/crystal-mode).
+- Download the `lsp-mode` [package](https://melpa.org/#/lsp-mode).
+- Make sure `crystalline` binary is in your PATH.
+
+At the moment, `lsp-mode` only knows about `scry` as the Crystal language server. So, to get it working
+with `crystalline` we need to configure `lsp-mode` to look for `crystalline`.
+
+You can use the following config snippet to achieve this:
+`elisp
+(with-eval-after-load 'lsp-mode
+  (add-to-list 'lsp-language-id-configuration
+               '(crystal-mode . "crystal"))
+  (lsp-register-client
+  (make-lsp-client :new-connection (lsp-stdio-connection '("crystalline"))
+                   :activation-fn (lsp-activate-on "crystal")
+                   :priority '1
+                   :server-id 'crystalline)))
+```
+
+This will give higher priority to `crystalline`, and Emacs should automatically connect to the
+backend whenever you're in `crystal-mode`.
+
+
 ### Entry point
 
 **Important:** Crystalline will try to determine which file is best suited as an
