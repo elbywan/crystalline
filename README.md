@@ -201,7 +201,7 @@ At the moment, `lsp-mode` only knows about `scry` as the Crystal language server
 with `crystalline` we need to configure `lsp-mode` to look for `crystalline`.
 
 You can use the following config snippet to achieve this:
-`elisp
+```elisp
 (with-eval-after-load 'lsp-mode
   (add-to-list 'lsp-language-id-configuration
                '(crystal-mode . "crystal"))
