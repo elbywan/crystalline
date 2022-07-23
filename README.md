@@ -196,7 +196,7 @@ Or just use a different LLVM major version until this issue is fixed upstream.
 Using Conquer of Completion we can configure Crystalline as our LSP backend and get all the features of Crystalline
 we would get with VSCode.
 
-- Download [vim-crystal](https://github.com/vim-crystal/vim-crystal)
+- Download [vim-crystal](https://github.com/vim-crystal/vim-crystal) plugin.
 - Download [CoC](https://github.com/neoclide/coc.nvim) plugin.
 - Make sure `crystalline` binary is in your PATH.
 
