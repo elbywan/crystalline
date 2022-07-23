@@ -191,6 +191,34 @@ Or just use a different LLVM major version until this issue is fixed upstream.
 - Reload the window by pressing CMD/CTRL + SHIFT + P and select
   `Developer: Reload Window` (or as an alternative, restart VSCode).
 
+#### Vim/Neovim
+
+Using Conquer of Completion we can configure Crystalline as our LSP backend and get all the features of Crystalline
+we would get with VSCode.
+
+- Download [vim-crystal](https://github.com/vim-crystal/vim-crystal)
+- Download [CoC](https://github.com/neoclide/coc.nvim) plugin.
+- Make sure `crystalline` binary is in your PATH.
+
+Add the following snippet to your `coc-settings.json` file:
+
+```json
+{
+"languageserver": {
+    "crystal": {
+      "command": "crystalline",
+      "args": [
+        "--stdio"
+      ],
+      "filetypes": [
+        "crystal"
+      ],
+      "rootPatterns": ["shard.yml"]
+    }
+  }
+}
+```
+
 #### Emacs
 
 - Download the `crystal-mode` [package](https://melpa.org/#/crystal-mode).
