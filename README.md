@@ -88,7 +88,7 @@ In the `.shard.yml` file:
 development_dependencies:
   crystalline:
     github: elbywan/crystalline
-    branch: main
+    branch: master
 ```
 
 Then:
