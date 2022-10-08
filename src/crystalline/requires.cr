@@ -1,3 +1,4 @@
+require "compiler/crystal/zero_one_or_many"
 require "compiler/crystal/annotatable"
 require "compiler/crystal/compiler"
 require "compiler/crystal/config"
