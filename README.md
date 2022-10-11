@@ -272,7 +272,7 @@ dependency tree then `crystalline` will use the file itself as the entry point.
 
 ```yml
 crystalline:
-  main: .crystalline_main.cr
+  main: ./crystalline_main.cr
 ```
 
 This can be extremely important to understand when you are writing a code
