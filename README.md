@@ -104,6 +104,7 @@ shards build crystalline --release --no-debug --progress -Dpreview_mt
 ```sh
 git clone https://github.com/elbywan/crystalline
 cd crystalline
+shards install
 mkdir bin
 crystal build ./src/crystalline.cr  -o ./bin/crystalline --release --no-debug --progress -Dpreview_mt
 ```
