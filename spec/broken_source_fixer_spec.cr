@@ -126,11 +126,51 @@ describe Crystalline::BrokenSourceFixer do
 
   it_fixes <<-CRYSTAL, <<-CRYSTAL
     def foo
+      call(1) do |x|
+    end
+    CRYSTAL
+    def foo
+      call(1) do |x|; end
+    end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    def foo
+      call(1) do |x, y|
+    end
+    CRYSTAL
+    def foo
+      call(1) do |x, y|; end
+    end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    def foo
       call(1) {
     end
     CRYSTAL
     def foo
       call(1) {; }
+    end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    def foo
+      call(1) { |x|
+    end
+    CRYSTAL
+    def foo
+      call(1) { |x|; }
+    end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    def foo
+      call(1) { |x, y|
+    end
+    CRYSTAL
+    def foo
+      call(1) { |x, y|; }
     end
     CRYSTAL
 end
