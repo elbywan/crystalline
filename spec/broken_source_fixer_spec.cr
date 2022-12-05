@@ -53,4 +53,44 @@ describe Crystalline::BrokenSourceFixer do
       puts 1
     end
     CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    class Foo
+      def bar
+      end
+    CRYSTAL
+    class Foo
+      def bar
+      end; end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    module Foo
+      def bar
+      end
+    CRYSTAL
+    module Foo
+      def bar
+      end; end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    struct Foo
+      def bar
+      end
+    CRYSTAL
+    struct Foo
+      def bar
+      end; end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    enum Foo
+      def bar
+      end
+    CRYSTAL
+    enum Foo
+      def bar
+      end; end
+    CRYSTAL
 end
