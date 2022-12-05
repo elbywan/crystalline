@@ -1,4 +1,4 @@
-require "./classes/**"
+require "./workspace"
 
 class Crystalline::Controller
   # The project workspace.
