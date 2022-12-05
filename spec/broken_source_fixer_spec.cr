@@ -37,4 +37,20 @@ describe Crystalline::BrokenSourceFixer do
       puts 1
     end
     CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    def foo
+      if bar
+        if baz
+
+      puts 1
+    end
+    CRYSTAL
+    def foo
+      if bar
+        if baz
+        end; end
+      puts 1
+    end
+    CRYSTAL
 end
