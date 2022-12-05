@@ -22,8 +22,7 @@ class Crystalline::BrokenSourceFixer
 
         # Check if this line has less indent than the indent
         # for the last opening keyword we found.
-        if (indent < last_info.indent ||
-           indent == last_info.indent && keyword != closing_keyword)
+        if wrong_indent?(indent, keyword, closing_keyword, last_info)
           # If that's the case we fix the opening keyword by
           # adding an "end" to it.
           last_line = lines[line_index - 1]
@@ -53,7 +52,7 @@ class Crystalline::BrokenSourceFixer
       end
 
       # Push to the stack if we found an opening keyword.
-      if keyword && keyword != "end" && keyword != "}"
+      if keyword && keyword != "end" && keyword != "}" && keyword != "else"
         stack << LineInfo.new(
           line_index: line_index,
           indent: indent,
@@ -90,10 +89,12 @@ class Crystalline::BrokenSourceFixer
       "do"
     elsif line.ends_with?(/\s*\)\s*{(\s*\|[^|]+\|)?\s*$/)
       "{"
-    elsif line.starts_with?(/\s*end\s*$/)
+    elsif line.matches?(/\s*end\s*$/)
       "end"
-    elsif line.starts_with?(/\s*}\s*$/)
+    elsif line.matches?(/\s*}\s*$/)
       "}"
+    elsif line.matches?(/\s*else\s*$/)
+      "else"
     else
       nil
     end
@@ -105,5 +106,18 @@ class Crystalline::BrokenSourceFixer
 
   private def self.closing_keyword(keyword : String)
     keyword == "{" ? "}" : "end"
+  end
+
+  private def self.wrong_indent?(
+    indent : Int32,
+    keyword : String?,
+    closing_keyword : String?,
+    last_info : LineInfo
+  )
+    return true if indent < last_info.indent
+
+    indent == last_info.indent &&
+      keyword != closing_keyword &&
+      !(last_info.keyword == "if" && keyword == "else")
   end
 end

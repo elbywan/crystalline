@@ -173,4 +173,18 @@ describe Crystalline::BrokenSourceFixer do
       call(1) { |x, y|; }
     end
     CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    def foo
+      if bar
+        1
+      else
+    end
+    CRYSTAL
+    def foo
+      if bar
+        1
+      else; end
+    end
+    CRYSTAL
 end
