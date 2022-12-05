@@ -1,4 +1,4 @@
-module Crystalline
+module Crystalline::Analysis
   class CursorVisitor < Crystal::Visitor
     include Crystal::TypedDefProcessor
 

@@ -1,4 +1,4 @@
-require "../lsp/base/diagnostic"
+require "lsp/base/diagnostic"
 
 class Crystalline::Diagnostics
   alias DiagnosticsHash = Hash(String, Array(LSP::Diagnostic))

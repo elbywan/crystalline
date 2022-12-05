@@ -1,4 +1,4 @@
-module Crystalline
+module Crystalline::Analysis
   class SubModuleVisitor < Crystal::Visitor
     getter submodules : Array(Crystal::ModuleType)
 

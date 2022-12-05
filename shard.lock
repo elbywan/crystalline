@@ -4,15 +4,19 @@ shards:
     git: https://github.com/spider-gazelle/bisect.git
     version: 1.2.1
 
+  lsp:
+    git: https://github.com/elbywan/crystal-lsp.git
+    version: 0.1.2
+
   priority-queue:
     git: https://github.com/spider-gazelle/priority-queue.git
     version: 1.0.1
 
   sentry:
     git: https://github.com/samueleaton/sentry.git
-    version: 0.3.2+git.commit.cd86128f94567594da9ddff78cc428c697754d88
+    version: 0.3.2+git.commit.e448ce83486f99ef016c311e10ec0cac805cded3
 
   version_from_shard:
     git: https://github.com/hugopl/version_from_shard.git
-    version: 1.2.4
+    version: 1.2.5
 

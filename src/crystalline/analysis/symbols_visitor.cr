@@ -1,4 +1,4 @@
-module Crystalline
+module Crystalline::Analysis
   class DocumentSymbolsVisitor < Crystal::Visitor
     getter symbols = Array(LSP::DocumentSymbol).new
     @parent_symbol : LSP::DocumentSymbol? = nil

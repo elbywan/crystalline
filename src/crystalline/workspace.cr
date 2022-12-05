@@ -3,6 +3,7 @@ require "yaml"
 require "./text_document"
 require "./progress"
 require "./result_cache"
+require "./analysis/*"
 
 class Crystalline::Workspace
   # The previous compilation results, indexed by compilation entry point.
@@ -598,7 +599,7 @@ class Crystalline::Workspace
       parser.filename = file_uri.decoded_path
       parser.wants_doc = false
 
-      DocumentSymbolsVisitor.new.tap { |visitor|
+      Analysis::DocumentSymbolsVisitor.new.tap { |visitor|
         parser.parse.accept(visitor)
       }.symbols
     }

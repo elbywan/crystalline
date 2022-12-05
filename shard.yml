@@ -11,6 +11,8 @@ targets:
     main: lib/sentry/src/sentry_cli.cr
 
 dependencies:
+  lsp:
+    github: elbywan/crystal-lsp
   version_from_shard:
     github: hugopl/version_from_shard
   priority-queue:
