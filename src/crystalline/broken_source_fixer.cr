@@ -70,7 +70,7 @@ class Crystalline::BrokenSourceFixer
     lines.join("\n")
   end
 
-  def self.line_indent(line : String) : Int32?
+  private def self.line_indent(line : String) : Int32?
     non_whitespace_char_index = line.each_char_with_index do |char, i|
       next if char.whitespace?
       break i
@@ -83,7 +83,7 @@ class Crystalline::BrokenSourceFixer
     end
   end
 
-  def self.line_keyword(line : String) : String?
+  private def self.line_keyword(line : String) : String?
     if line.starts_with?(/\s*(if|def|class|struct|module|enum|annotation)\s/)
       $1
     elsif line.ends_with?(/\s*do(\s+\|[^|]+\|)?\s*$/)
@@ -99,11 +99,11 @@ class Crystalline::BrokenSourceFixer
     end
   end
 
-  def self.closing_keyword(line_info : LineInfo)
+  private def self.closing_keyword(line_info : LineInfo)
     closing_keyword(line_info.keyword)
   end
 
-  def self.closing_keyword(keyword : String)
+  private def self.closing_keyword(keyword : String)
     keyword == "{" ? "}" : "end"
   end
 end
