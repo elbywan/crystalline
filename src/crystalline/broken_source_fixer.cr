@@ -83,7 +83,7 @@ class Crystalline::BrokenSourceFixer
   end
 
   private def self.line_keyword(line : String) : String?
-    if line.starts_with?(/\s*(if|def|class|struct|module|enum|annotation)\s/)
+    if line.starts_with?(/\s*(if|unless|while|until|def|class|struct|module|enum|annotation)\s/)
       $1
     elsif line.ends_with?(/\s*do(\s+\|[^|]+\|)?\s*$/)
       "do"
@@ -118,6 +118,7 @@ class Crystalline::BrokenSourceFixer
 
     indent == last_info.indent &&
       keyword != closing_keyword &&
-      !(last_info.keyword == "if" && keyword == "else")
+      !(last_info.keyword == "if" && keyword == "else") &&
+      !(last_info.keyword == "unless" && keyword == "else")
   end
 end

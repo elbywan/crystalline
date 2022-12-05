@@ -175,6 +175,24 @@ describe Crystalline::BrokenSourceFixer do
     CRYSTAL
 
   it_fixes <<-CRYSTAL, <<-CRYSTAL
+    unless foo
+    CRYSTAL
+    unless foo; end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    while foo
+    CRYSTAL
+    while foo; end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    until foo
+    CRYSTAL
+    until foo; end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
     def foo
       if bar
         1
@@ -183,6 +201,20 @@ describe Crystalline::BrokenSourceFixer do
     CRYSTAL
     def foo
       if bar
+        1
+      else; end
+    end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    def foo
+      unless bar
+        1
+      else
+    end
+    CRYSTAL
+    def foo
+      unless bar
         1
       else; end
     end
