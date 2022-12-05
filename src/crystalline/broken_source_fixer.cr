@@ -52,7 +52,7 @@ class Crystalline::BrokenSourceFixer
       end
 
       # Push to the stack if we found an opening keyword.
-      if keyword && keyword != "end" && keyword != "}" && keyword != "else"
+      if keyword && keyword != "end" && keyword != "}" && keyword != "else" && keyword != "elsif"
         stack << LineInfo.new(
           line_index: line_index,
           indent: indent,
@@ -95,6 +95,8 @@ class Crystalline::BrokenSourceFixer
       "}"
     elsif line.matches?(/\s*else\s*$/)
       "else"
+    elsif line.starts_with?(/\s*elsif\s+/)
+      "elsif"
     else
       nil
     end
@@ -119,6 +121,7 @@ class Crystalline::BrokenSourceFixer
     indent == last_info.indent &&
       keyword != closing_keyword &&
       !(last_info.keyword == "if" && keyword == "else") &&
+      !(last_info.keyword == "if" && keyword == "elsif") &&
       !(last_info.keyword == "unless" && keyword == "else")
   end
 end

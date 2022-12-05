@@ -219,4 +219,18 @@ describe Crystalline::BrokenSourceFixer do
       else; end
     end
     CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    def foo
+      if bar
+        1
+      elsif bar
+    end
+    CRYSTAL
+    def foo
+      if bar
+        1
+      elsif bar; end
+    end
+    CRYSTAL
 end
