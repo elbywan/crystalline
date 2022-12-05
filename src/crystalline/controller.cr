@@ -20,7 +20,11 @@ class Crystalline::Controller
   def when_ready : Nil
     # Compile the workspace at once.
     spawn same_thread: true do
-      workspace.compile(@server)
+      workspace.projects.each do |p|
+        if entry_point = p.entry_point?
+          workspace.compile(@server, entry_point)
+        end
+      end
     end
   end
 
