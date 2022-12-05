@@ -81,7 +81,7 @@ class Crystalline::BrokenSourceFixer
   end
 
   def self.line_keyword(line : String) : String?
-    if line.starts_with?(/\s*(if|def|class|struct|module|enum)\s/)
+    if line.starts_with?(/\s*(if|def|class|struct|module|enum|annotation)\s/)
       $1
     elsif line.starts_with?(/\s*end\s*$/)
       "end"

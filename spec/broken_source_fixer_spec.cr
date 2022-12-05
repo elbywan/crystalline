@@ -93,4 +93,14 @@ describe Crystalline::BrokenSourceFixer do
       def bar
       end; end
     CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    class Foo
+      annotation Bar
+    end
+    CRYSTAL
+    class Foo
+      annotation Bar; end
+    end
+    CRYSTAL
 end
