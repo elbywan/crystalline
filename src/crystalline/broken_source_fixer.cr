@@ -91,18 +91,4 @@ class Crystalline::BrokenSourceFixer
       nil
     end
   end
-
-  def self.check
-    last_info = stack.last?
-    if last_info && indent < last_info.indent
-      if keyword == "end" && indent == last_info.indent
-        # All good: an end is closing an opening keyword
-        stack.pop
-        next
-      end
-
-      lines[line_index - 1] = lines[line_index - 1] + "; end"
-      stack.pop
-    end
-  end
 end
