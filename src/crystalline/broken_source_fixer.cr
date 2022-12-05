@@ -16,11 +16,14 @@ class Crystalline::BrokenSourceFixer
 
       while true
         last_info = stack.last?
+        break unless last_info
+
+        closing_keyword = closing_keyword(last_info)
+
         # Check if this line has less indent than the indent
         # for the last opening keyword we found.
-        if last_info &&
-           (indent < last_info.indent ||
-           indent == last_info.indent && keyword != "end")
+        if (indent < last_info.indent ||
+           indent == last_info.indent && keyword != closing_keyword)
           # If that's the case we fix the opening keyword by
           # adding an "end" to it.
           last_line = lines[line_index - 1]
@@ -29,9 +32,9 @@ class Crystalline::BrokenSourceFixer
             if last_line.blank?
               # If the line is empty we can change it to an end
               # and even use the correct indent.
-              last_line = ("  " * last_info.indent) + "end"
+              last_line = ("  " * last_info.indent) + closing_keyword
             else
-              last_line + "; end"
+              last_line + "; " + closing_keyword
             end
 
           stack.pop
@@ -43,14 +46,14 @@ class Crystalline::BrokenSourceFixer
 
       # If we found an "end" at exactly the indentation of the last
       # opening keyword, remove it from the stack.
-      if keyword == "end" && indent == last_info.try(&.indent)
+      if last_info && indent == last_info.indent && keyword == closing_keyword(last_info)
         # all good: an end is closing an opening keyword
         stack.pop
         next
       end
 
       # Push to the stack if we found an opening keyword.
-      if keyword && keyword != "end"
+      if keyword && keyword != "end" && keyword != "}"
         stack << LineInfo.new(
           line_index: line_index,
           indent: indent,
@@ -83,12 +86,24 @@ class Crystalline::BrokenSourceFixer
   def self.line_keyword(line : String) : String?
     if line.starts_with?(/\s*(if|def|class|struct|module|enum|annotation)\s/)
       $1
-    elsif line.ends_with?(/\s*do$/)
+    elsif line.ends_with?(/\s*do\s*$/)
       "do"
+    elsif line.ends_with?(/\s*\)\s*{\s*$/)
+      "{"
     elsif line.starts_with?(/\s*end\s*$/)
       "end"
+    elsif line.starts_with?(/\s*}\s*$/)
+      "}"
     else
       nil
     end
+  end
+
+  def self.closing_keyword(line_info : LineInfo)
+    closing_keyword(line_info.keyword)
+  end
+
+  def self.closing_keyword(keyword : String)
+    keyword == "{" ? "}" : "end"
   end
 end
