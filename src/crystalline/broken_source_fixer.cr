@@ -89,6 +89,8 @@ class Crystalline::BrokenSourceFixer
       "do"
     elsif line.ends_with?(/\s*\)\s*{(\s*\|[^|]+\|)?\s*$/)
       "{"
+    elsif line.ends_with?(/\s*[\w\d]\s*{(\s*\|[^|]+\|)?\s*$/)
+      "{"
     elsif line.matches?(/\s*end\s*$/)
       "end"
     elsif line.matches?(/\s*}\s*$/)
