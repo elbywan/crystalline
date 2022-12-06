@@ -31,9 +31,9 @@ class Crystalline::BrokenSourceFixer
             if last_line.blank?
               # If the line is empty we can change it to an end
               # and even use the correct indent.
-              last_line = ("  " * last_info.indent) + closing_keyword
+              "#{("  " * last_info.indent)}#{closing_keyword}"
             else
-              last_line + "; " + closing_keyword
+              "#{last_line}; #{closing_keyword}"
             end
 
           stack.pop
@@ -62,7 +62,7 @@ class Crystalline::BrokenSourceFixer
     end
 
     while line_info = stack.pop?
-      lines[-1] = lines[-1] + "; " + closing_keyword(line_info)
+      lines[-1] = "#{lines[-1]}; #{closing_keyword(line_info)}"
     end
 
     lines.join("\n")
