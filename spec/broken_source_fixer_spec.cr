@@ -269,4 +269,70 @@ describe Crystalline::BrokenSourceFixer do
       elsif bar; end
     end
     CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    private def foo
+    CRYSTAL
+    private def foo; end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    protected def foo
+    CRYSTAL
+    protected def foo; end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    private class Foo
+    CRYSTAL
+    private class Foo; end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    private struct Foo
+    CRYSTAL
+    private struct Foo; end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    private module Foo
+    CRYSTAL
+    private module Foo; end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    private enum Foo
+    CRYSTAL
+    private enum Foo; end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    private annotation Foo
+    CRYSTAL
+    private annotation Foo; end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    abstract class Foo
+    CRYSTAL
+    abstract class Foo; end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    private abstract class Foo
+    CRYSTAL
+    private abstract class Foo; end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    abstract struct Foo
+    CRYSTAL
+    abstract struct Foo; end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    private abstract struct Foo
+    CRYSTAL
+    private abstract struct Foo; end
+    CRYSTAL
 end
