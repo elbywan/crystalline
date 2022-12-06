@@ -56,7 +56,7 @@ class Crystalline::BrokenSourceFixer
       end
 
       # Push to the stack if we found an opening keyword.
-      if keyword && keyword != "end" && keyword != "}" && keyword != "else" && keyword != "elsif"
+      if keyword && !closing_keyword?(keyword)
         stack << LineInfo.new(
           line_index: line_index,
           indent: indent,
@@ -125,6 +125,10 @@ class Crystalline::BrokenSourceFixer
 
   private def self.closing_keyword(keyword : String)
     keyword == "{" ? "}" : "end"
+  end
+
+  private def self.closing_keyword?(keyword : String)
+    keyword.in?("end", "else", "elsif", "}")
   end
 
   private def self.wrong_indent?(
