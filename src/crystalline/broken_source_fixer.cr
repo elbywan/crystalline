@@ -22,7 +22,7 @@ class Crystalline::BrokenSourceFixer
 
         # Check if this line has less indent than the indent
         # for the last opening keyword we found.
-        if wrong_indent?(indent, keyword, closing_keyword, last_info)
+        if wrong_indent?(indent, keyword, closing_keyword, last_info, line)
           # If that's the case we fix the opening keyword by
           # adding an "end" to it.
           last_line = lines[line_index - 1]
@@ -127,14 +127,51 @@ class Crystalline::BrokenSourceFixer
     indent : Int32,
     keyword : String?,
     closing_keyword : String?,
-    last_info : LineInfo
+    last_info : LineInfo,
+    line : String
   )
-    return true if indent < last_info.indent
+    # If the indent is less than the opening one it's definitely wrong.
+    if indent < last_info.indent
+      return true
+    end
 
-    indent == last_info.indent &&
-      keyword != closing_keyword &&
-      !(last_info.keyword == "if" && keyword == "else") &&
-      !(last_info.keyword == "if" && keyword == "elsif") &&
-      !(last_info.keyword == "unless" && keyword == "else")
+    # If the indent is greater, it's all good (it's probably content inside that definition)
+    if indent > last_info.indent
+      return false
+    end
+
+    # All good if it's the closing keyword to an opening definition
+    if keyword == closing_keyword
+      return false
+    end
+
+    # Some special cases: else and elsif have the same indentation as
+    # the opening keyword but they don't close it (more content is expected
+    # to come until the "end" keyword)
+    if last_info.keyword == "if" && keyword == "else"
+      return false
+    end
+
+    if last_info.keyword == "if" && keyword == "elsif"
+      return false
+    end
+
+    if last_info.keyword == "unless" && keyword == "else"
+      return false
+    end
+
+    # A def signature can also be defined in multiple lines, like this:
+    #
+    # def foo(
+    #   x, y
+    # )
+    #
+    # In that case we don't want to consider the closing parentheses
+    # as having wrong indentation.
+    if last_info.keyword == "def" && line.strip == ")"
+      return false
+    end
+
+    true
   end
 end

@@ -335,4 +335,14 @@ describe Crystalline::BrokenSourceFixer do
     CRYSTAL
     private abstract struct Foo; end
     CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    def foo(
+    )
+      1
+    CRYSTAL
+    def foo(
+    )
+      1; end
+    CRYSTAL
 end
