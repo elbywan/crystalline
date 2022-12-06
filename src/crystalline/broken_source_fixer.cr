@@ -61,9 +61,8 @@ class Crystalline::BrokenSourceFixer
       end
     end
 
-    until stack.empty?
-      lines[-1] = lines[-1] + "; end"
-      stack.pop
+    while line_info = stack.pop?
+      lines[-1] = lines[-1] + "; " + closing_keyword(line_info)
     end
 
     lines.join("\n")

@@ -205,6 +205,12 @@ describe Crystalline::BrokenSourceFixer do
     CRYSTAL
 
   it_fixes <<-CRYSTAL, <<-CRYSTAL
+    call x {
+    CRYSTAL
+    call x {; }
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
     unless foo
     CRYSTAL
     unless foo; end
