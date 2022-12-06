@@ -28,27 +28,23 @@ class Crystalline::BrokenSourceFixer
 
         closing_keyword = closing_keyword(last_info)
 
-        # Check if this line has less indent than the indent
-        # for the last opening keyword we found.
-        if wrong_indent?(indent, keyword, closing_keyword, last_info, line)
-          # If that's the case we fix the opening keyword by
-          # adding an "end" to it.
-          last_line = lines[line_index - 1]
+        # Nothing to fix unless there's a wrong indent
+        break unless wrong_indent?(indent, keyword, closing_keyword, last_info, line)
 
-          lines[line_index - 1] =
-            if last_line.blank?
-              # If the line is empty we can change it to an end
-              # and even use the correct indent.
-              "#{("  " * last_info.indent)}#{closing_keyword}"
-            else
-              "#{last_line}; #{closing_keyword}"
-            end
+        # We have a wrong indentation so we fix/close the opening keyword
+        # by adding an "end" (or "}") to it.
+        last_line = lines[line_index - 1]
 
-          stack.pop
-        else
-          # If that's not the case we are still keeping a good indent.
-          break
-        end
+        lines[line_index - 1] =
+          if last_line.blank?
+            # If the line is empty we can change it to an end
+            # and even use the correct indent.
+            "#{("  " * last_info.indent)}#{closing_keyword}"
+          else
+            "#{last_line}; #{closing_keyword}"
+          end
+
+        stack.pop
       end
 
       # If we found an "end" at exactly the indentation of the last
