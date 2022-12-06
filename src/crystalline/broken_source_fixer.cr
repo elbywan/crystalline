@@ -1,10 +1,18 @@
 class Crystalline::BrokenSourceFixer
+  # Keep track of opening and closing keywords, and their idents,
+  # as they happen in the code.
   record LineInfo,
     line_index : Int32,
     indent : Int32,
     keyword : String
 
+  # Try to fix a broken source code by adding missing "end" and "}"
+  # according to indentation.
   def self.fix(source : String) : String
+    # Keep a stack of opening keywords.
+    # We push to the stack when we find an opening keyword and
+    # we pop from the stack when we find a closing keyword,
+    # or when we find a wrong indentation.
     stack = [] of LineInfo
 
     lines = source.lines

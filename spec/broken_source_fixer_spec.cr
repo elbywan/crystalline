@@ -345,4 +345,12 @@ describe Crystalline::BrokenSourceFixer do
     )
       1; end
     CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    foo 1,
+      bar do
+    CRYSTAL
+    foo 1,
+      bar do; end
+    CRYSTAL
 end
