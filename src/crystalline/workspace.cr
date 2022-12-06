@@ -608,13 +608,13 @@ class Crystalline::Workspace
   end
 
   private def fix_source(source : String) : String
-    LSP::Log.info { "Fixing source: #{source}" }
+    # LSP::Log.info { "Fixing source: #{source}" }
     Crystal::Parser.parse(source)
-    LSP::Log.info { "No need to fix source!" }
+    # LSP::Log.info { "No need to fix source!" }
     source
   rescue
     fixed_source = BrokenSourceFixer.fix(source)
-    LSP::Log.info { "Fixed source: #{fixed_source}" }
+    # LSP::Log.info { "Fixed source: #{fixed_source}" }
     fixed_source
   end
 end
