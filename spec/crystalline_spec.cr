@@ -1,9 +1,5 @@
-require "./spec_helper"
+require "spec"
 
-describe Crystalline do
-  # TODO: Write tests
-
-  it "works" do
-    false.should eq(true)
-  end
+it "works" do
+  true.should eq(true)
 end

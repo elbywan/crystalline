@@ -1,0 +1,16 @@
+name: Specs
+
+on:
+  push:
+  pull_request:
+    branches: [master]
+jobs:
+  specs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download source
+        uses: actions/checkout@v2
+      - name: Install Crystal
+        uses: crystal-lang/install-crystal@v1
+      - name: Run tests
+        run: crystal spec
