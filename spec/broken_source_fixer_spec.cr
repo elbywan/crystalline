@@ -353,4 +353,64 @@ describe Crystalline::BrokenSourceFixer do
     foo 1,
       bar do; end
     CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    begin
+      puts 1
+    CRYSTAL
+    begin
+      puts 1; end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    begin
+      puts 1
+    rescue
+      puts 2
+    CRYSTAL
+    begin
+      puts 1
+    rescue
+      puts 2; end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    begin
+      puts 1
+    rescue ex
+      puts 2
+    CRYSTAL
+    begin
+      puts 1
+    rescue ex
+      puts 2; end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    begin
+      puts 1
+    ensure
+      puts 2
+    CRYSTAL
+    begin
+      puts 1
+    ensure
+      puts 2; end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    begin
+      puts 1
+    rescue
+      puts 2
+    else
+      puts 3
+    CRYSTAL
+    begin
+      puts 1
+    rescue
+      puts 2
+    else
+      puts 3; end
+    CRYSTAL
 end

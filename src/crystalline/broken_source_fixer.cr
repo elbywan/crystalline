@@ -100,6 +100,8 @@ class Crystalline::BrokenSourceFixer
         (private\s+)?annotation
       )\s/x)
       $1
+    elsif line.matches?(/\s*begin\s*$/)
+      "begin"
     elsif line.ends_with?(/\s*do(\s+\|[^|]+\|)?\s*$/)
       "do"
     elsif line.ends_with?(/\s*\)\s*{(\s*\|[^|]+\|)?\s*$/)
@@ -114,6 +116,10 @@ class Crystalline::BrokenSourceFixer
       "else"
     elsif line.starts_with?(/\s*elsif\s+/)
       "elsif"
+    elsif line.starts_with?(/\s*rescue(\b|\s)/)
+      "rescue"
+    elsif line.matches?(/\s*ensure\s*$/)
+      "ensure"
     else
       nil
     end
@@ -128,7 +134,7 @@ class Crystalline::BrokenSourceFixer
   end
 
   private def self.closing_keyword?(keyword : String)
-    keyword.in?("end", "else", "elsif", "}")
+    keyword.in?("end", "else", "elsif", "rescue", "ensure", "}")
   end
 
   private def self.wrong_indent?(
@@ -165,6 +171,10 @@ class Crystalline::BrokenSourceFixer
     end
 
     if last_info.keyword == "unless" && keyword == "else"
+      return false
+    end
+
+    if last_info.keyword == "begin" && keyword.in?("rescue", "ensure", "else")
       return false
     end
 
