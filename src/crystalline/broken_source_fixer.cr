@@ -174,7 +174,7 @@ class Crystalline::BrokenSourceFixer
       return false
     end
 
-    if last_info.keyword.in?("begin", "def") && keyword.in?("rescue", "ensure", "else")
+    if last_info.keyword.in?("begin", "def", "do") && keyword.in?("rescue", "ensure", "else")
       return false
     end
 
