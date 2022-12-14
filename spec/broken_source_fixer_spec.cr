@@ -413,4 +413,44 @@ describe Crystalline::BrokenSourceFixer do
     else
       puts 3; end
     CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    def foo
+      puts 1
+    rescue
+      puts 2
+    CRYSTAL
+    def foo
+      puts 1
+    rescue
+      puts 2; end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    def foo
+      puts 1
+    rescue
+      puts 2
+    else
+      puts 3
+    CRYSTAL
+    def foo
+      puts 1
+    rescue
+      puts 2
+    else
+      puts 3; end
+    CRYSTAL
+
+  it_fixes <<-CRYSTAL, <<-CRYSTAL
+    def foo
+      puts 1
+    ensure
+      puts 2
+    CRYSTAL
+    def foo
+      puts 1
+    ensure
+      puts 2; end
+    CRYSTAL
 end
