@@ -179,6 +179,8 @@ class Crystalline::Workspace
           file_overrides = Hash(String, String).new
           @opened_documents.each { |uri_str, text_document|
             contents = text_overrides.try(&.[uri_str]?) || text_document.contents
+            contents = fix_source(contents)
+
             if target_string == uri_str
               # If the entry point itself needs to be loaded from memory.
               sources = [
@@ -371,7 +373,7 @@ class Crystalline::Workspace
 
     # LSP::Log.info { "completion: #{trigger_character}"}
 
-    document_lines = text_document.contents.lines(chomp: false)
+    document_lines = fix_source(text_document.contents).lines(chomp: false)
     left_offset = 0
     right_offset = 0
     truncate_line = false
@@ -595,7 +597,7 @@ class Crystalline::Workspace
 
   def document_symbols(server : LSP::Server, file_uri : URI)
     @opened_documents[file_uri.to_s]?.try { |text_document|
-      parser = Crystal::Parser.new(text_document.contents)
+      parser = Crystal::Parser.new(fix_source(text_document.contents))
       parser.filename = file_uri.decoded_path
       parser.wants_doc = false
 
@@ -603,5 +605,16 @@ class Crystalline::Workspace
         parser.parse.accept(visitor)
       }.symbols
     }
+  end
+
+  private def fix_source(source : String) : String
+    # LSP::Log.info { "Fixing source: #{source}" }
+    Crystal::Parser.parse(source)
+    # LSP::Log.info { "No need to fix source!" }
+    source
+  rescue
+    fixed_source = BrokenSourceFixer.fix(source)
+    # LSP::Log.info { "Fixed source: #{fixed_source}" }
+    fixed_source
   end
 end
