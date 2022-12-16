@@ -20,7 +20,7 @@ semantic checking) and ease development with any compatible code editor.**
 <hr/>
 
 <div align="center">
-<img src="assets/small_demo.gif" height="300" />
+<img src="assets/small_demo.gif" height="300" width="360"/>
 </div>
 
 ## Installation
