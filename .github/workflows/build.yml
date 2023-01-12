@@ -38,5 +38,5 @@ jobs:
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v2
         with:
-          name: crystalline_x86_64-unknown-linux-gnu
+          name: crystalline_x86_64-unknown-linux-musl
           path: ./crystalline

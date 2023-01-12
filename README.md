@@ -48,7 +48,7 @@ Building from source does take a long time._
 ##### Linux (x86_64)
 
 ```sh
-wget https://github.com/elbywan/crystalline/releases/latest/download/crystalline_x86_64-unknown-linux-gnu.gz -O crystalline.gz &&\
+wget https://github.com/elbywan/crystalline/releases/latest/download/crystalline_x86_64-unknown-linux-musl.gz -O crystalline.gz &&\
 gzip -d crystalline.gz &&\
 chmod u+x crystalline
 ```

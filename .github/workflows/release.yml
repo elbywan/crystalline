@@ -37,7 +37,7 @@ jobs:
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v2
         with:
-          name: crystalline_x86_64-unknown-linux-gnu
+          name: crystalline_x86_64-unknown-linux-musl
           path: ./crystalline
   release:
     needs: [macos, linux]
@@ -65,8 +65,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./artifacts/crystalline_x86_64-unknown-linux-gnu/crystalline.gz
-          asset_name: crystalline_x86_64-unknown-linux-gnu.gz
+          asset_path: ./artifacts/crystalline_x86_64-unknown-linux-musl/crystalline.gz
+          asset_name: crystalline_x86_64-unknown-linux-musl.gz
           asset_content_type: application/gzip
       - name: Attach macOS binary
         uses: actions/upload-release-asset@v1
