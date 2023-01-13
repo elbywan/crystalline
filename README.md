@@ -382,9 +382,7 @@ Debug logs are deactivated by default, uncomment this line in
 
 **Please always `crystal tool format` your code!**
 
-## Contributors
-
-- [elbywan](https://github.com/elbywan) - creator and maintainer
+## [Contributors](https://github.com/elbywan/crystalline/graphs/contributors)
 
 ## Credit
 
