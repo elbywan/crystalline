@@ -253,7 +253,7 @@ backend whenever you're in `crystal-mode`.
 **Important:** Crystalline will try to determine which file is best suited as an
 entry point when providing language features.
 
-The default behaviour is to check the `shards.yml` file for a `target` entry
+The default behaviour is to check the `shard.yml` file for a `target` entry
 with the same name as the shard.
 
 ```yml
