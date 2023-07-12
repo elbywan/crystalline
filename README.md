@@ -32,7 +32,8 @@ Building from source does take a long time._
 
 | Crystal   | Crystalline |
 | --------- | ----------- |
-| **1.8.x** | **0.9**     |
+| **1.9.x** | **0.10**    |
+| 1.8       | 0.9         |
 | 1.7       | 0.8         |
 | 1.6       | 0.7         |
 | 1.4       | 0.6         |
