@@ -112,6 +112,10 @@ mkdir bin
 crystal build ./src/crystalline.cr  -o ./bin/crystalline --release --no-debug --progress -Dpreview_mt
 ```
 
+libs needed: 
+- libyaml (usually in yaml-dev pkg)
+- libstdc++-dev
+- llvm-dev: 15,14,13,12,11,10,9,8 (any of these versions)
 #### Known Build Issues
 
 _Potential errors when building from source._
