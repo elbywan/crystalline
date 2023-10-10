@@ -1,5 +1,6 @@
 require "llvm/lib_llvm"
 require "compiler/crystal/annotatable"
+require "compiler/crystal/tools/dependencies"
 require "compiler/crystal/compiler"
 require "compiler/crystal/config"
 require "compiler/crystal/crystal_path"
