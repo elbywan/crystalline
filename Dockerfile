@@ -1,17 +1,14 @@
-FROM crystallang/crystal:1.10.0-alpine
+FROM 84codes/crystal:1.10.0-alpine
 
 WORKDIR /app
 
 # Add llvm deps.
 RUN apk add --update --no-cache --force-overwrite \
-      llvm15-dev llvm15-static g++ libxml2-static make
+      llvm15-dev llvm15-static g++ libxml2-static
 
 # Build crystalline.
 COPY . /app/
 
-RUN git clone -b 1.10.0 --depth=1 https://github.com/crystal-lang/crystal \
-      && make -C crystal llvm_ext \
-      && CRYSTAL_PATH=crystal/src:lib shards build crystalline \
+RUN shards build crystalline \
       --no-debug --progress --stats --production --static --release \
-      -Dpreview_mt --ignore-crystal-version \
-      && rm -rf crystal
+      -Dpreview_mt --ignore-crystal-version

@@ -5,41 +5,40 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
-  schedule:
-    - cron: "0 0 10 * 6"
 
 jobs:
-  macos:
-    runs-on: macos-latest
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            arch: x86_64
+            ext: x86_64-apple-darwin
+          - os: macos-latest
+            arch: arm64
+            ext: arm64-apple-darwin
+          - os: ubuntu-latest
+            arch: amd64
+            platform: linux/amd64
+            ext: x86_64-unknown-linux-musl
+          - os: ubuntu-latest
+            arch: arm64
+            platform: linux/arm64
+            ext: arm64-unknown-linux-musl
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-      - name: Install Crystal
-        env:
-          HOMEBREW_NO_INSTALL_UPGRADE: 1
-          HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: 1
-        run: brew update && brew install openssl crystal
-      - name: Build the binary
-        env:
-          LLVM_CONFIG: /usr/local/opt/llvm@15/bin/llvm-config
-        run: shards build crystalline --release --no-debug -Dpreview_mt --stats --progress --ignore-crystal-version
-      - name: Upload a Build Artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: crystalline_x86_64-apple-darwin
-          path: ./bin/crystalline
-  linux:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
       - name: Build the static binary
-        run: docker build -t crystalline .
-      - name: Copy binary to host
-        run: |
-          docker run -v $PWD:/app/host --rm crystalline:latest cp ./bin/crystalline ./host/crystalline
+        run: docker buildx build --platform ${{ matrix.platform }} --tag crystalline:latest .
+      - name: Extract the static binary
+        run: docker cp $(docker create --platform ${{ matrix.platform }} crystalline:latest):/crystalline ./crystalline
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v2
         with:
-          name: crystalline_x86_64-unknown-linux-musl
+          name: crystalline_${{ matrix.ext }}
           path: ./crystalline
