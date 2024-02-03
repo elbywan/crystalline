@@ -7,7 +7,10 @@ on:
 
 jobs:
   macos:
-    runs-on: macos-latest
+    strategy:
+      matrix:
+        runner: [macos-latest, macos-14]
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -15,17 +18,17 @@ jobs:
         env:
           HOMEBREW_NO_INSTALL_UPGRADE: 1
           HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: 1
-        run: brew update && brew install openssl crystal
+        run: brew update && brew install crystal || true
       - name: Install dependencies
         run: shards install --production --ignore-crystal-version
       - name: Build the binary
-        env:
-          LLVM_CONFIG: /usr/local/opt/llvm@17/bin/llvm-config
-        run: shards build crystalline --release --no-debug -Dpreview_mt --stats --progress --ignore-crystal-version
+        run: |
+          export LLVM_CONFIG="$(brew --prefix)/opt/llvm@17/bin/llvm-config"
+          shards build crystalline --release --no-debug -Dpreview_mt --stats --progress --ignore-crystal-version
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v2
         with:
-          name: crystalline_x86_64-apple-darwin
+          name: crystalline_${{ matrix.runner == 'macos-latest' && 'x86_64' || 'arm64' }}-apple-darwin
           path: ./bin/crystalline
   linux:
     runs-on: ubuntu-latest
@@ -71,7 +74,7 @@ jobs:
           asset_path: ./artifacts/crystalline_x86_64-unknown-linux-musl/crystalline.gz
           asset_name: crystalline_x86_64-unknown-linux-musl.gz
           asset_content_type: application/gzip
-      - name: Attach macOS binary
+      - name: Attach macOS x86_64 binary
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -79,4 +82,13 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./artifacts/crystalline_x86_64-apple-darwin/crystalline.gz
           asset_name: crystalline_x86_64-apple-darwin.gz
+          asset_content_type: application/gzip
+      - name: Attach macOS arm64 binary
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/crystalline_arm64-apple-darwin/crystalline.gz
+          asset_name: crystalline_arm64-apple-darwin.gz
           asset_content_type: application/gzip
