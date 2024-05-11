@@ -24,7 +24,7 @@ jobs:
         run: brew update && brew install crystal || true
       - name: Build the binary
         run: |
-          export LLVM_CONFIG="$(brew --prefix)/opt/llvm@17/bin/llvm-config"
+          export LLVM_CONFIG="$(brew --prefix)/opt/llvm@18/bin/llvm-config"
           shards build crystalline --release --no-debug -Dpreview_mt --stats --progress --ignore-crystal-version
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v2
