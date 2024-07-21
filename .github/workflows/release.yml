@@ -26,7 +26,7 @@ jobs:
           export LLVM_CONFIG="$(brew --prefix)/opt/llvm@18/bin/llvm-config"
           shards build crystalline --release --no-debug -Dpreview_mt --stats --progress --ignore-crystal-version
       - name: Upload a Build Artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: crystalline_${{ matrix.runner == 'macos-latest' && 'arm64' || 'x86_64' }}-apple-darwin
           path: ./bin/crystalline
@@ -41,7 +41,7 @@ jobs:
         run: |
           docker run -v $PWD:/app/host --rm crystalline:latest cp ./bin/crystalline ./host/crystalline
       - name: Upload a Build Artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: crystalline_x86_64-unknown-linux-musl
           path: ./crystalline
@@ -50,7 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           path: ./artifacts
       - name: Compress artifacts
