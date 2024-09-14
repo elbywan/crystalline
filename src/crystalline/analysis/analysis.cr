@@ -37,7 +37,7 @@ module Crystalline::Analysis
         if lib_path_override = lib_path
           path = Crystal::CrystalPath.default_path_without_lib.split(Process::PATH_DELIMITER)
           path.insert(0, lib_path_override)
-          compiler.crystal_path = Crystal::CrystalPath.new(path.join(Process::PATH_DELIMITER))
+          compiler.crystal_path = Crystal::CrystalPath.new([path.join(Process::PATH_DELIMITER)])
         end
 
         reply = begin
