@@ -295,6 +295,19 @@ use it as the entry point.
 require "./spec/**"
 ```
 
+### Multiple projects
+
+If you have multiple Crystal projects in a single folder (e.g. a monorepo), you can add a `projects` field in the root `shard.yml` file, containing an array of paths or globs to the underlying Crystal projects:
+
+```yml
+crystalline:
+  projects:
+    - projects/my_project_1
+    - workspaces/**
+```
+
+Each of these projects must contain the `shard.yml`, ideally with the entry point as mentioned above. However, even if no entry point is present, `require`s will still be resolved relative to the project directory rather than the root directory.
+
 ## Features
 
 **Disclaimer: `Crystalline` is not as extensive in terms of features as other
@@ -371,7 +384,7 @@ LSP::Log.info { "log" }
 ```
 
 Debug logs are deactivated by default, uncomment this line in
-`src/crystalline/lsp/server.cr` to enable them:
+`src/crystalline/main.cr` to enable them:
 
 ```crystal
 # Uncomment:

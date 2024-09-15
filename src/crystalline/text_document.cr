@@ -1,14 +1,15 @@
 require "priority-queue"
 require "uri"
+require "./project"
 
 class Crystalline::TextDocument
   getter uri : URI
   @inner_contents : Array(String) = [] of String
   getter! version : Int32
   @pending_changes : Priority::Queue({String, LSP::Range}) = Priority::Queue({String, LSP::Range}).new
+  getter? project : Project?
 
-  def initialize(uri : String, contents : String)
-    @uri = URI.parse(uri)
+  def initialize(@uri, @project, contents : String)
     self.contents = contents
   end
 

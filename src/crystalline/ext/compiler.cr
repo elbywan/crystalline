@@ -198,4 +198,29 @@ module Crystal
       }
     end
   end
+
+  struct CrystalPath
+    # Adds functionality to get the CRYSTAL_PATH value, but without the default
+    # library directory.
+    def self.default_path_without_lib
+      parts = self.default_path.split(Process::PATH_DELIMITER)
+      parts.select(&.!=(DEFAULT_LIB_PATH)).join(Process::PATH_DELIMITER)
+    end
+  end
+
+  class Program
+    # Make it possible to use a custom library path.
+    setter crystal_path
+  end
+
+  class Compiler
+    # Make it possible to use a custom library path with the Program.
+    property crystal_path = Crystal::CrystalPath.new
+
+    private def new_program(sources)
+      program = previous_def
+      program.crystal_path = crystal_path
+      program
+    end
+  end
 end
