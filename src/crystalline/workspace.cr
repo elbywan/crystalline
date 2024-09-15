@@ -19,6 +19,14 @@ class Crystalline::Workspace
   def initialize(server : LSP::Server, root_uri : String?)
     if @root_uri = root_uri.try &->URI.parse(String)
       @projects = Project.find_in_workspace_root @root_uri.not_nil!
+      if @projects.size > 0
+        LSP::Log.info {
+          <<-LOG
+          "[workspace] Found projects:
+          #{@projects.map(&.root_uri.decoded_path).join('\n')}
+          LOG
+        }
+      end
     end
   end
 
@@ -116,6 +124,9 @@ class Crystalline::Workspace
     end
 
     project = Project.best_fit_for_file(@projects, file_uri)
+
+    # LSP::Log.info { "Compiling #{file_uri}, project: #{project.try(&.root_uri.decoded_path)}" }
+
     if project && (entry_point = project.entry_point?)
       target = entry_point
       progress = Progress.new(
@@ -198,7 +209,7 @@ class Crystalline::Workspace
       select
       when result = sync_channel.receive
         result
-      # Just in case…
+        # Just in case…
       when timeout 120.seconds
         progress.send_progress_end(server)
         nil

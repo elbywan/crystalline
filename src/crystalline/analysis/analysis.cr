@@ -20,6 +20,9 @@ module Crystalline::Analysis
     diagnostics = Diagnostics.new
     reply_channel = Channel(Crystal::Compiler::Result | Exception).new
 
+    # LSP::Log.info { "sources: #{sources.map(&.filename)}" }
+    # LSP::Log.info { "lib_path: #{lib_path}" }
+
     # Delegate heavy processing to a separate thread.
     Thread.new do
       wait_before_termination = Channel(Nil).new
@@ -37,7 +40,7 @@ module Crystalline::Analysis
         if lib_path_override = lib_path
           path = Crystal::CrystalPath.default_path_without_lib.split(Process::PATH_DELIMITER)
           path.insert(0, lib_path_override)
-          compiler.crystal_path = Crystal::CrystalPath.new([path.join(Process::PATH_DELIMITER)])
+          compiler.crystal_path = Crystal::CrystalPath.new(path)
         end
 
         reply = begin

@@ -18,10 +18,10 @@ module Crystalline
     hover_provider: true,
     definition_provider: true,
     document_symbol_provider: true,
-  # signature_help_provider: LSP::SignatureHelpOptions.new(
+    # signature_help_provider: LSP::SignatureHelpOptions.new(
     #   trigger_characters: ["(", " "]
     # ),
-)
+  )
 
   module EnvironmentConfig
     # Add the `crystal env` environment variables to the current env.
@@ -47,6 +47,7 @@ module Crystalline
 
   def self.init(*, input : IO = STDIN, output : IO = STDOUT)
     EnvironmentConfig.run
+    # ::Log.setup(:debug, LSP::Log.backend.not_nil!)
     server = LSP::Server.new(input, output, SERVER_CAPABILITIES)
     Controller.new(server)
   rescue ex

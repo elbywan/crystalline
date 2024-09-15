@@ -1,12 +1,6 @@
 require "yaml"
 
 class Crystalline::Project
-  class ProjectFile
-    include YAML::Serializable
-
-    getter projects : Array(String) = [] of String
-  end
-
   # The project root filesystem uri.
   getter root_uri : URI
   # The dependencies of the project, meaning the list of files required by the compilation target (entry point).
@@ -37,20 +31,35 @@ class Crystalline::Project
 
   # Finds and returns an array of all projects in the workspace root.
   def self.find_in_workspace_root(workspace_root_uri : URI) : Array(Project)
+    root_project = Project.new(workspace_root_uri)
     # First, check for a Crystalline project file.
     begin
-      crystalline_path = Path[workspace_root_uri.decoded_path, ".crystalline.yml"]
-      crystalline_file = File.open(crystalline_path) do |file|
-        ProjectFile.from_yaml(file)
+      path = Path[workspace_root_uri.decoded_path, "shard.yml"]
+      shards_yaml = File.open(path) do |file|
+        YAML.parse(file)
       end
 
-      crystalline_file.projects.map do |p|
-        path = Path[workspace_root_uri.decoded_path, p].normalize
-        Project.new(URI.parse("file://#{path}"))
-      end
+      projects = shards_yaml.dig?("crystalline", "projects").try do |pjs|
+        Dir.glob(pjs.as_a.map(&.as_s)).reduce([] of Project) do |acc, match|
+          path = Path.new(match)
+
+          is_directory = File.directory?(path)
+          has_shard_yml = is_directory && File.exists?(Path[path, "shard.yml"])
+          is_not_lib = has_shard_yml && path.parent != "lib"
+
+          if is_directory && has_shard_yml && is_not_lib
+            normalized_path = Path[workspace_root_uri.decoded_path, path].normalize
+            acc << Project.new(URI.parse("file://#{normalized_path}"))
+          else
+            acc
+          end
+        end
+      end || [] of Project
+
+      projects << root_project
     rescue e
       # Failing that, create a project for the workspace root.
-      [Project.new(workspace_root_uri)]
+      [root_project]
     end
   end
 
@@ -58,9 +67,8 @@ class Crystalline::Project
   # dependency of this workspace's entry point, returns nil.
   def distance_to_dependency(file_uri : URI) : Int32?
     file_path = file_uri.decoded_path
-    return nil if !file_path.in?(dependencies)
-
     relative = Path[file_uri.decoded_path].relative_to?(root_uri.decoded_path)
+
     # If we can't get a relative path, give it the maximum distance possible, so
     # it's the lowest priority.
     return Int32::MAX if relative.nil?
