@@ -15,7 +15,35 @@ written in and for the [Crystal Language](https://crystal-lang.org/). It aims to
 provide limited language features (like go-to, autocompletion, syntax and
 semantic checking) and ease development with any compatible code editor.**
 
-**Status: in development.**
+> [!IMPORTANT]
+>
+> ### Project Status
+>
+> I am **passively** maintaining this project which means that I will not be
+> regularly adding new features or fixing bugs. My time is **very** limited and I have
+> other projects that I want to work on.
+>
+> Crystalline begun as a fun experiment because at the time there was no working LSP for
+> Crystal, and was written mainly to cater to my own needs - on my free time. I was happy to
+> open-source it and share it with the community because I thought it could be
+> useful to others.
+>
+> But over time, some vocal people in the Crystal community have been openly
+> trash-talking the project in the (un)official discord channel, telling users
+> to avoid using it and spreading misinformation, which I am not cool with.
+>
+> Crystalline has a bunch of issues, but if you know what you are doing, it can be a very
+> useful tool. I know that because I am the primary user of it.
+>
+> Due to the nature of the Crystal language and the way the compiler works, it
+> is not possible to provide a full-fledged language server with all the
+> features that one would expect. If you have a problem
+> with that, then I suggest you use another language - or wait for someone else
+> to write a better LSP (which I would be happy to see, but doubt will happen).
+>
+> I am not paid to work on this project, I do it for fun.
+>
+> **And unfortunately, the fun has been sucked out of it.**
 
 <hr/>
 
