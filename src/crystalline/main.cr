@@ -2,11 +2,10 @@ require "log"
 require "lsp/server"
 require "./ext/*"
 require "./*"
-require "version_from_shard"
 
 module Crystalline
-  VersionFromShard.declare(__DIR__)
-
+  VERSION = {{ (`shards version #{__DIR__}`.strip + "+" +
+                system("git rev-parse --short HEAD || echo unknown").stringify).stringify.strip }}
   # Supported server capabilities.
   SERVER_CAPABILITIES = LSP::ServerCapabilities.new(
     text_document_sync: LSP::TextDocumentSyncKind::Incremental,
