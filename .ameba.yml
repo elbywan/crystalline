@@ -1,0 +1,50 @@
+Metrics/CyclomaticComplexity:
+  Enabled: false
+
+Style/ParenthesesAroundCondition:
+  Description: Disallows redundant parentheses around control expressions
+  ExcludeTernary: false
+  AllowSafeAssignment: true
+  Enabled: true
+  Severity: Convention
+
+Documentation/DocumentationAdmonition:
+  Enabled: false
+  Severity: Warning
+
+Lint/NotNil:
+  Description: Identifies usage of `not_nil!` calls
+  Excluded:
+    - src/crystalline/analysis/analysis.cr
+    - src/crystalline/result_cache.cr
+    - src/crystalline/workspace.cr
+  Enabled: true
+  Severity: Warning
+
+Naming/BlockParameterName:
+  Enabled: false
+  Severity: Convention
+
+Lint/RedundantStringCoercion:
+  Description: Disallows redundant string conversions in interpolation
+  Enabled: true
+  Severity: Warning
+
+Lint/ShadowingOuterLocalVar:
+  Description:
+    Disallows the usage of the same name as outer local variables for block
+    or proc arguments
+  Excluded:
+    - src/crystalline/ext/compiler.cr
+  Enabled: true
+  Severity: Warning
+
+Naming/QueryBoolMethods:
+  Description: Reports boolean properties without the `?` suffix
+  Enabled: false
+  Severity: Convention
+
+Style/WhileTrue:
+  Description: Disallows while statements with a true literal as condition
+  Enabled: false
+  Severity: Convention

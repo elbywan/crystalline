@@ -21,7 +21,7 @@ module Crystalline::Analysis
       (@parent_symbol.try(&.children) || @symbols) << symbol
     end
 
-    private def with_parent(symbol : LSP::DocumentSymbol)
+    private def with_parent(symbol : LSP::DocumentSymbol, &)
       append_symbol(symbol)
       old_parent = @parent_symbol
       @parent_symbol = symbol
@@ -91,7 +91,7 @@ module Crystalline::Analysis
     end
 
     def visit(node : Crystal::Arg)
-      if (@parent_symbol.try &.kind.enum?)
+      if @parent_symbol.try &.kind.enum?
         symbol = create_symbol_from_node(node, :enum_member)
         append_symbol(symbol)
       end

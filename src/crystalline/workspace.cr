@@ -17,7 +17,7 @@ class Crystalline::Workspace
   getter projects = [] of Project
 
   def initialize(server : LSP::Server, root_uri : String?)
-    if @root_uri = root_uri.try &->URI.parse(String)
+    if (@root_uri = root_uri.try &->URI.parse(String))
       @projects = Project.find_in_workspace_root @root_uri.not_nil!
       if @projects.size > 0
         LSP::Log.info {
@@ -88,7 +88,7 @@ class Crystalline::Workspace
 
   # Run a top level semantic analysis to compute dependencies.
   def recalculate_dependencies(server, project)
-    return unless target = project.entry_point?
+    return unless (target = project.entry_point?)
 
     lib_path = project.default_lib_path
     Analysis.compile(server, target, lib_path: lib_path, ignore_diagnostics: true, wants_doc: false, top_level: true, compiler_flags: project.flags).try { |result|
@@ -275,7 +275,7 @@ class Crystalline::Workspace
         contents << code_markdown(str, language: "crystal")
         append_markdown_doc contents, n.resolved_type.doc
       elsif n.is_a? Crystal::Call
-        if definition = n.target_defs.try &.first?
+        if (definition = n.target_defs.try &.first?)
           contents << code_markdown(Utils.format_def(definition), language: "crystal")
         elsif n.expanded && n.expanded_macro
           contents << code_markdown(n.expanded.to_s, language: "crystal")
@@ -542,7 +542,7 @@ class Crystalline::Workspace
         # Context autocompletion.
         context = Analysis.context_at(result, location)
         if trigger_character == "@"
-          context.try &.select! { |name| name.starts_with? "@" }
+          context.try &.select!(&.starts_with?("@"))
         end
         context.try &.each { |name, type|
           label = "#{name} : #{type}"

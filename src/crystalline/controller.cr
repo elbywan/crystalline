@@ -21,7 +21,7 @@ class Crystalline::Controller
     # Compile the workspace at once.
     spawn same_thread: true do
       workspace.projects.each do |p|
-        if entry_point = p.entry_point?
+        if (entry_point = p.entry_point?)
           workspace.compile(@server, entry_point)
         end
       end

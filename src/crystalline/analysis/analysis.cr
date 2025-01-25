@@ -51,7 +51,7 @@ module Crystalline::Analysis
       compiler.stderr = dev_null
       compiler.flags = compiler_flags
 
-      if lib_path_override = lib_path
+      if (lib_path_override = lib_path)
         path = Crystal::CrystalPath.default_path_without_lib.split(Process::PATH_DELIMITER)
         path.insert(0, lib_path_override)
         compiler.crystal_path = Crystal::CrystalPath.new(path)
@@ -123,13 +123,13 @@ module Crystalline::Analysis
       LSP::Log.debug { "Class of node at cursor: #{node.class} " }
       locations = begin
         if node.is_a? Crystal::Call
-          if defs = node.target_defs
+          if (defs = node.target_defs)
             defs.compact_map { |d|
               start_location = d.location.try { |loc| loc.expanded_location || loc }.not_nil!
               end_location = d.end_location.try { |loc| loc.expanded_location || loc }.not_nil!
               {start_location, end_location}
             }
-          elsif expanded_macro = node.expanded_macro
+          elsif (expanded_macro = node.expanded_macro)
             start_location = expanded_macro.location.try { |loc| loc.expanded_location || loc }.not_nil!
             end_location = expanded_macro.end_location.try { |loc| loc.expanded_location || loc } || start_location
             [{start_location, end_location}]
@@ -152,18 +152,18 @@ module Crystalline::Analysis
         elsif node.is_a? Crystal::Union
           Utils.locations_from_union(node, nodes)
         elsif node.is_a? Crystal::Var
-          if definition = context[node.to_s]?
+          if (definition = context[node.to_s]?)
             _, location = definition
             [{location, location}] if location
           end
         elsif node.is_a? Crystal::InstanceVar
-          if ivar = context["self"]?.try &.[0].try &.lookup_instance_var? node.name
-            if location = ivar.location
+          if (ivar = context["self"]?.try &.[0].try &.lookup_instance_var? node.name)
+            if (location = ivar.location)
               [{location, location}]
             end
           end
         elsif node.is_a? Crystal::ClassVar
-          if cvar = context["self"]?.try &.[0].try &.all_class_vars[node.name]? # lookup_raw_class_var? node.name
+          if (cvar = context["self"]?.try &.[0].try &.all_class_vars[node.name]?) # lookup_raw_class_var? node.name
             if (location = cvar.location)
               [{location, location}]
             end

@@ -38,7 +38,7 @@ module Crystalline::Utils
         }
       elsif type.is_a? Crystal::Union
         self.locations_from_union(type, nodes, locations: locations)
-      elsif location = type.location
+      elsif (location = type.location)
         end_location = type.end_location || location
         locations << {location, end_location}
       end
@@ -54,7 +54,7 @@ module Crystalline::Utils
 
       typ ||= elt.type?
 
-      if p = (typ.try &.lookup_path(path))
+      if (p = (typ.try &.lookup_path(path)))
         break p
       end
     end
@@ -101,7 +101,7 @@ module Crystalline::Utils
           str << arg.to_s
           printed_arg = true
         end
-        if double_splat = d.double_splat
+        if (double_splat = d.double_splat)
           str << ", " if printed_arg
           str << "**"
           str << double_splat
