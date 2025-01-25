@@ -25,9 +25,7 @@ class Crystalline::TextDocument
     @inner_contents.size
   end
 
-  alias ContentChange = {contents: String, range: LSP::Range?}
-
-  def update_contents(content_changes = Array(ContentChange), version : Number? = nil)
+  def update_contents(content_changes : Array({String, LSP::Range?}), version : Number? = nil)
     content_changes.each { |change|
       update_contents(*change, version: version)
     }
