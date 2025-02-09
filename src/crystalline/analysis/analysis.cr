@@ -3,6 +3,20 @@ require "./cursor_visitor"
 require "./submodule_visitor"
 
 module Crystalline::Analysis
+  {% if flag?(:preview_mt) %}
+    @@dedicated_thread : Thread = Thread.new(name: "crystalline-dedicated-thread") do
+      scheduler = Thread.current.scheduler
+      scheduler.run_loop
+    end
+  {% end %}
+
+  private def self.spawn_dedicated(*, name : String? = nil, &block)
+    fiber = Fiber.new(name, &block)
+    {% if flag?(:preview_mt) %} fiber.set_current_thread(@@dedicated_thread) {% end %}
+    fiber.enqueue
+    fiber
+  end
+
   # Compile a target *file_uri*.
   def self.compile(server : LSP::Server, file_uri : URI, *, lib_path : String? = nil, file_overrides : Hash(String, String)? = nil, ignore_diagnostics = false, wants_doc = false, fail_fast = false, top_level = false)
     if file_uri.scheme == "file"
@@ -24,45 +38,40 @@ module Crystalline::Analysis
     # LSP::Log.info { "lib_path: #{lib_path}" }
 
     # Delegate heavy processing to a separate thread.
-    Thread.new do
-      wait_before_termination = Channel(Nil).new
-      spawn same_thread: true do
-        dev_null = File.open(File::NULL, "w")
-        compiler = Crystal::Compiler.new
-        compiler.no_codegen = true
-        compiler.color = false
-        compiler.no_cleanup = true
-        compiler.file_overrides = file_overrides
-        compiler.wants_doc = wants_doc
-        compiler.stdout = dev_null
-        compiler.stderr = dev_null
+    spawn_dedicated do
+      dev_null = File.open(File::NULL, "w")
+      compiler = Crystal::Compiler.new
+      compiler.no_codegen = true
+      compiler.color = false
+      compiler.no_cleanup = true
+      compiler.file_overrides = file_overrides
+      compiler.wants_doc = wants_doc
+      compiler.stdout = dev_null
+      compiler.stderr = dev_null
 
-        if lib_path_override = lib_path
-          path = Crystal::CrystalPath.default_path_without_lib.split(Process::PATH_DELIMITER)
-          path.insert(0, lib_path_override)
-          compiler.crystal_path = Crystal::CrystalPath.new(path)
-        end
-
-        reply = begin
-          if top_level
-            # Top level only.
-            compiler.top_level_semantic(sources)
-          elsif fail_fast
-            # Regular parser + semantic analysis phases.
-            compiler.compile(sources, "")
-          else
-            # Fail-slow means that errors are collected instead of throwing during the semantic phase, and we still get a partially typed AST back.
-            compiler.fail_slow_compile(sources, "")
-          end
-        end
-        reply_channel.send(reply)
-      rescue e : Exception
-        reply_channel.send(e)
-      ensure
-        dev_null.try &.close
-        wait_before_termination.send nil
+      if lib_path_override = lib_path
+        path = Crystal::CrystalPath.default_path_without_lib.split(Process::PATH_DELIMITER)
+        path.insert(0, lib_path_override)
+        compiler.crystal_path = Crystal::CrystalPath.new(path)
       end
-      wait_before_termination.receive
+
+      reply = begin
+        if top_level
+          # Top level only.
+          compiler.top_level_semantic(sources)
+        elsif fail_fast
+          # Regular parser + semantic analysis phases.
+          compiler.compile(sources, "")
+        else
+          # Fail-slow means that errors are collected instead of throwing during the semantic phase, and we still get a partially typed AST back.
+          compiler.fail_slow_compile(sources, "")
+        end
+      end
+      reply_channel.send(reply)
+    rescue e : Exception
+      reply_channel.send(e)
+    ensure
+      dev_null.try &.close
     end
     result = reply_channel.receive
 
