@@ -103,7 +103,7 @@ module Crystal
     # Will not raise if the semantic analysis fails.
     def error_tolerant_semantic(node : ASTNode, cleanup = true) : ASTNode
       node, processor = top_level_semantic(node)
-      error_tolerant = true
+      @error_tolerant = true
       error_stack.clear
 
       begin
