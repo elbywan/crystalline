@@ -23,7 +23,7 @@ jobs:
         run: shards install --production --ignore-crystal-version
       - name: Build the binary
         run: |
-          export LLVM_CONFIG="$(brew --prefix)/opt/llvm@19/bin/llvm-config"
+          export LLVM_CONFIG="$(brew --prefix)/opt/llvm@20/bin/llvm-config"
           shards build crystalline --release --no-debug -Dpreview_mt --stats --progress --ignore-crystal-version
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v4
