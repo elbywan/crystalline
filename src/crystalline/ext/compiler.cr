@@ -87,23 +87,23 @@ module Crystal
 
   class Compiler
     # Will not raise if the semantic analysis fails.
-    def fail_slow_compile(source : Source | Array(Source), output_filename : String) : Result
+    def error_tolerant_compile(source : Source | Array(Source), output_filename : String) : Result
       source = [source] unless source.is_a?(Array)
       program = new_program(source)
       node = parse program, source
-      node = program.fail_slow_semantic node, cleanup: !no_cleanup?
+      node = program.error_tolerant_semantic node, cleanup: !no_cleanup?
       Result.new(program, node)
     end
   end
 
   class Program
-    property fail_slow = false
+    property error_tolerant = false
     getter error_stack = Set(Crystal::CodeError).new
 
     # Will not raise if the semantic analysis fails.
-    def fail_slow_semantic(node : ASTNode, cleanup = true) : ASTNode
+    def error_tolerant_semantic(node : ASTNode, cleanup = true) : ASTNode
       node, processor = top_level_semantic(node)
-      fail_slow = true
+      error_tolerant = true
       error_stack.clear
 
       begin
@@ -181,7 +181,7 @@ module Crystal
         visitor.end_visit_any self
       end
     rescue e : Crystal::CodeError
-      if !visitor.is_a?(Crystal::TopLevelVisitor) && visitor.responds_to? :program && visitor.program.fail_slow
+      if !visitor.is_a?(Crystal::TopLevelVisitor) && visitor.responds_to? :program && visitor.program.error_tolerant
         visitor.program.error_stack << e
       else
         ::raise e

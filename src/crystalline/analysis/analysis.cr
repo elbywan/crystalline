@@ -63,8 +63,8 @@ module Crystalline::Analysis
           # Regular parser + semantic analysis phases.
           compiler.compile(sources, "")
         else
-          # Fail-slow means that errors are collected instead of throwing during the semantic phase, and we still get a partially typed AST back.
-          compiler.fail_slow_compile(sources, "")
+          # Error tolerant means that errors are collected instead of throwing during the semantic phase, and we still get a partially typed AST back.
+          compiler.error_tolerant_compile(sources, "")
         end
       end
       reply_channel.send(reply)
