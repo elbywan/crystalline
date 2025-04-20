@@ -46,7 +46,9 @@ module Crystalline
 
   def self.init(*, input : IO = STDIN, output : IO = STDOUT)
     EnvironmentConfig.run
-    # ::Log.setup(:debug, LSP::Log.backend.not_nil!)
+    {% if flag?(:debug) %}
+      ::Log.setup(:debug, LSP::Log.backend.not_nil!)
+    {% end %}
     server = LSP::Server.new(input, output, SERVER_CAPABILITIES)
     Controller.new(server)
   rescue ex

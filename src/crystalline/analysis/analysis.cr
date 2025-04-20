@@ -18,24 +18,25 @@ module Crystalline::Analysis
   end
 
   # Compile a target *file_uri*.
-  def self.compile(server : LSP::Server, file_uri : URI, *, lib_path : String? = nil, file_overrides : Hash(String, String)? = nil, ignore_diagnostics = false, wants_doc = false, fail_fast = false, top_level = false)
+  def self.compile(server : LSP::Server, file_uri : URI, *, lib_path : String? = nil, file_overrides : Hash(String, String)? = nil, ignore_diagnostics = false, wants_doc = false, fail_fast = false, top_level = false, compiler_flags : Array(String) = [] of String)
     if file_uri.scheme == "file"
       file = File.new file_uri.decoded_path
       sources = [
         Crystal::Compiler::Source.new(file_uri.decoded_path, file.gets_to_end),
       ]
       file.close
-      self.compile(server, sources, lib_path: lib_path, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, top_level: top_level)
+      self.compile(server, sources, lib_path: lib_path, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, top_level: top_level, compiler_flags: compiler_flags)
     end
   end
 
   # Compile an array of *sources*.
-  def self.compile(server : LSP::Server, sources : Array(Crystal::Compiler::Source), *, lib_path : String? = nil, file_overrides : Hash(String, String)? = nil, ignore_diagnostics = false, wants_doc = false, fail_fast = false, top_level = false)
+  def self.compile(server : LSP::Server, sources : Array(Crystal::Compiler::Source), *, lib_path : String? = nil, file_overrides : Hash(String, String)? = nil, ignore_diagnostics = false, wants_doc = false, fail_fast = false, top_level = false, compiler_flags : Array(String) = [] of String)
     diagnostics = Diagnostics.new
     reply_channel = Channel(Crystal::Compiler::Result | Exception).new
 
     # LSP::Log.info { "sources: #{sources.map(&.filename)}" }
     # LSP::Log.info { "lib_path: #{lib_path}" }
+    LSP::Log.info { "compiler_flags: #{compiler_flags}" }
 
     # Delegate heavy processing to a separate thread.
     spawn_dedicated do
@@ -48,6 +49,7 @@ module Crystalline::Analysis
       compiler.wants_doc = wants_doc
       compiler.stdout = dev_null
       compiler.stderr = dev_null
+      compiler.flags = compiler_flags
 
       if lib_path_override = lib_path
         path = Crystal::CrystalPath.default_path_without_lib.split(Process::PATH_DELIMITER)

@@ -7,15 +7,11 @@ class Crystalline::Project
   property dependencies : Set(String) = Set(String).new
   # Determines the project entry point.
   getter? entry_point : URI? do
-    path = Path[root_uri.decoded_path, "shard.yml"]
-    shards_yaml = File.open(path) do |file|
-      YAML.parse(file)
-    end
-    shard_name = shards_yaml["name"].as_s
+    shard_name = shard_yaml["name"].as_s
     # If shard.yml has the `crystalline/main` key, use that.
-    relative_main = shards_yaml.dig?("crystalline", "main").try &.as_s
+    relative_main = shard_yaml.dig?("crystalline", "main").try &.as_s
     # Else if shard.yml has a `targets/[shard name]/main` key, use that.
-    relative_main ||= shards_yaml.dig?("targets", shard_name, "main").try &.as_s
+    relative_main ||= shard_yaml.dig?("targets", shard_name, "main").try &.as_s
     if relative_main && File.exists? Path[root_uri.decoded_path, relative_main]
       main_path = Path[root_uri.decoded_path, relative_main]
       # Add the entry point as a dependency to itself.
@@ -24,6 +20,19 @@ class Crystalline::Project
     end
   rescue e
     nil
+  end
+  # Flags to pass to the underlying compiler (-Dpreview_mt, etc).
+  getter flags : Array(String) do
+    (shard_yaml.dig?("crystalline", "flags").try(&.as_a.map(&.as_s)) || [] of String).tap do |flags|
+      LSP::Log.info { "Flags for project #{root_uri}: #{flags}" }
+    end
+  end
+
+  private getter shard_yaml : YAML::Any do
+    path = Path[root_uri.decoded_path, "shard.yml"]
+    shards_yaml = File.open(path) do |file|
+      YAML.parse(file)
+    end
   end
 
   def initialize(@root_uri)

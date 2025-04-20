@@ -339,6 +339,17 @@ crystalline:
 
 Each of these projects must contain the `shard.yml`, ideally with the entry point as mentioned above. However, even if no entry point is present, `require`s will still be resolved relative to the project directory rather than the root directory.
 
+### Compilation flags
+
+To use specific compilation flags, you can add a `crystalline/flags` key in the `shard.yml` file:
+
+```yml
+crystalline:
+  flags:
+    - preview_mt
+    - execution_context
+```
+
 ## Features
 
 **Disclaimer: `Crystalline` is not as extensive in terms of features as other

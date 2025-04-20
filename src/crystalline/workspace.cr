@@ -91,7 +91,7 @@ class Crystalline::Workspace
     return unless target = project.entry_point?
 
     lib_path = project.default_lib_path
-    Analysis.compile(server, target, lib_path: lib_path, ignore_diagnostics: true, wants_doc: false, top_level: true).try { |result|
+    Analysis.compile(server, target, lib_path: lib_path, ignore_diagnostics: true, wants_doc: false, top_level: true, compiler_flags: project.flags).try { |result|
       project.dependencies = result.program.requires
     }
   rescue
@@ -114,7 +114,7 @@ class Crystalline::Workspace
     text_overrides = nil,
     fail_fast = false,
     top_level = false,
-    discard_nil_cached_result = false
+    discard_nil_cached_result = false,
   )
     @projects.each do |project|
       # If the project has less than 1 dependency, it could mean that the last
@@ -185,7 +185,7 @@ class Crystalline::Workspace
         end
 
         lib_path = project.try(&.default_lib_path)
-        result = Analysis.compile(server, sources || target, lib_path: lib_path, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, top_level: top_level)
+        result = Analysis.compile(server, sources || target, lib_path: lib_path, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, top_level: top_level, compiler_flags: project.try(&.flags) || [] of String)
         # Store the result in the cache, unless a client event invalided the previous cache.
         # For instance if a compilation is running, but the user saved the document in the meantime (before completion)
         # then we discard the result because it is already outdated.

@@ -23,4 +23,8 @@ development_dependencies:
 
 crystal: ">= 0.36.1, < 2.0.0"
 
+crystalline:
+  flags:
+    - preview_mt
+
 license: MIT
