@@ -1,0 +1,48 @@
+name: Crystal Ameba
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "**/*.cr"
+  pull_request:
+    branches:
+      - master
+    paths:
+      - "**/*.cr"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        ameba-version: [v1.6.4]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Crystal
+        uses: crystal-lang/install-crystal@v1
+
+      - name: Cache Ameba binary
+        id: cache-ameba
+        uses: actions/cache@v3
+        with:
+          path: bin/ameba
+          key: ${{ runner.os }}-ameba-${{ matrix.ameba-version }}
+
+      - name: Build Ameba
+        if: steps.cache-ameba.outputs.cache-hit != 'true'
+        run: |
+          git clone --branch ${{ matrix.ameba-version }} --single-branch https://github.com/crystal-ameba/ameba.git
+          cd ameba
+          make bin/ameba CRFLAGS='-Dpreview_mt --no-debug'
+          mkdir -p ../bin
+          mv bin/ameba ../bin/ameba
+          cd ..
+          rm -rf ameba
+
+      - name: Run Ameba Linter
+        run: bin/ameba -c .ameba.yml
