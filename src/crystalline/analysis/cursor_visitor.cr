@@ -75,7 +75,7 @@ module Crystalline::Analysis
     end
 
     def visit(node)
-      if node_location = node.location
+      if (node_location = node.location)
         node_end_location = nearest_end_location(node)
 
         if @top_level

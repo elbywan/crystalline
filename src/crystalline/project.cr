@@ -75,7 +75,6 @@ class Crystalline::Project
   # Finds the path-wise distance to the given file URI. If the file URI is not a
   # dependency of this workspace's entry point, returns nil.
   def distance_to_dependency(file_uri : URI) : Int32?
-    file_path = file_uri.decoded_path
     relative = Path[file_uri.decoded_path].relative_to?(root_uri.decoded_path)
 
     # If we can't get a relative path, give it the maximum distance possible, so

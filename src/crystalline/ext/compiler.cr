@@ -18,7 +18,7 @@ module Crystal
   class SemanticVisitor < Visitor
     # Make it possible to visit in-memory.
     def visit(node : Require)
-      if expanded = node.expanded
+      if (expanded = node.expanded)
         expanded.accept self
         return false
       end
@@ -103,7 +103,7 @@ module Crystal
     # Will not raise if the semantic analysis fails.
     def error_tolerant_semantic(node : ASTNode, cleanup = true) : ASTNode
       node, processor = top_level_semantic(node)
-      error_tolerant = true
+      @error_tolerant = true
       error_stack.clear
 
       begin

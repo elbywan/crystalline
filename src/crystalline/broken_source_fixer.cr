@@ -65,7 +65,7 @@ class Crystalline::BrokenSourceFixer
       end
     end
 
-    while line_info = stack.pop?
+    while (line_info = stack.pop?)
       lines[-1] = "#{lines[-1]}; #{closing_keyword(line_info)}"
     end
 
@@ -142,7 +142,7 @@ class Crystalline::BrokenSourceFixer
     keyword : String?,
     closing_keyword : String?,
     last_info : LineInfo,
-    line : String
+    line : String,
   )
     # If the indent is less than the opening one it's definitely wrong.
     if indent < last_info.indent
