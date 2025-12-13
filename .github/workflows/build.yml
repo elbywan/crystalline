@@ -46,3 +46,63 @@ jobs:
         with:
           name: crystalline_x86_64-unknown-linux-musl
           path: ./crystalline
+  freebsd:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: freebsd {0}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Start FreeBSD VM
+        uses: jenseng/dynamic-uses@v1
+        with:
+          uses: vmactions/freebsd-vm@v1
+          with: >
+            {
+              "arch": "x86_64",
+              "sync": "nfs",
+              "usesh": "true"
+            }
+      - name: Install dependencies
+        run: |
+          pkg install -y crystal shards git
+      - name: Build the binary
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          shards build crystalline --release --no-debug -Dpreview_mt --stats --progress --ignore-crystal-version
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: crystalline_x86_64-freebsd
+          path: ./bin/crystalline
+  openbsd:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: openbsd {0}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Start OpenBSD VM
+        uses: jenseng/dynamic-uses@v1
+        with:
+          uses: vmactions/openbsd-vm@v1
+          with: >
+            {
+              "arch": "x86_64",
+              "sync": "nfs",
+              "usesh": "true"
+            }
+      - name: Install dependencies
+        run: |
+          pkg_add -v crystal git
+      - name: Build the binary
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          shards build crystalline --release --no-debug -Dpreview_mt --stats --progress --ignore-crystal-version
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: crystalline_x86_64-openbsd
+          path: ./bin/crystalline

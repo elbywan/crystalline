@@ -45,8 +45,73 @@ jobs:
         with:
           name: crystalline_x86_64-unknown-linux-musl
           path: ./crystalline
+  freebsd:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: freebsd {0}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Start FreeBSD VM
+        uses: jenseng/dynamic-uses@v1
+        with:
+          uses: vmactions/freebsd-vm@v1
+          with: >
+            {
+              "arch": "x86_64",
+              "sync": "nfs",
+              "usesh": "true"
+            }
+      - name: Install dependencies
+        run: |
+          pkg install -y crystal shards git
+      - name: Build the binary
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          shards build crystalline --release --no-debug -Dpreview_mt --stats --progress --ignore-crystal-version
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: crystalline_x86_64-freebsd
+          path: ./bin/crystalline
+  openbsd:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: openbsd {0}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Start OpenBSD VM
+        uses: jenseng/dynamic-uses@v1
+        with:
+          uses: vmactions/openbsd-vm@v1
+          with: >
+            {
+              "arch": "x86_64",
+              "sync": "nfs",
+              "usesh": "true"
+            }
+      - name: Install dependencies
+        run: |
+          pkg_add -v crystal git
+      - name: Build the binary
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          shards build crystalline --release --no-debug -Dpreview_mt --stats --progress --ignore-crystal-version
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: crystalline_x86_64-openbsd
+          path: ./bin/crystalline
   release:
-    needs: [macos, linux]
+    needs:
+      - macos
+      - linux
+      - freebsd
+      - openbsd
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
@@ -91,4 +156,22 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./artifacts/crystalline_arm64-apple-darwin/crystalline.gz
           asset_name: crystalline_arm64-apple-darwin.gz
+          asset_content_type: application/gzip
+      - name: Attach FreeBSD binary
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/crystalline_x86_64-freebsd/crystalline.gz
+          asset_name: crystalline_x86_64-freebsd.gz
+          asset_content_type: application/gzip
+      - name: Attach OpenBSD binary
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/crystalline_x86_64-openbsd/crystalline.gz
+          asset_name: crystalline_x86_64-openbsd.gz
           asset_content_type: application/gzip
