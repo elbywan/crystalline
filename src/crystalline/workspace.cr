@@ -18,14 +18,15 @@ class Crystalline::Workspace
 
   def initialize(server : LSP::Server, root_uri : String?)
     if (@root_uri = root_uri.try &->URI.parse(String))
+      # ameba:disable Lint/NotNil!
       @projects = Project.find_in_workspace_root @root_uri.not_nil!
       if @projects.size > 0
-        LSP::Log.info {
+        LSP::Log.info do
           <<-LOG
-          "[workspace] Found projects:
-          #{@projects.map(&.root_uri.decoded_path).join('\n')}
-          LOG
-        }
+            [workspace] Found projects:
+            #{@projects.map(&.root_uri.decoded_path).join('\n')}
+            LOG
+        end
       end
     end
   end
@@ -40,16 +41,16 @@ class Crystalline::Workspace
 
   def update_document(server : LSP::Server, params : LSP::DidChangeTextDocumentParams)
     file_uri = params.text_document.uri
-    @opened_documents[file_uri]?.try { |document|
-      content_changes = params.content_changes.map { |change|
+    @opened_documents[file_uri]?.try do |document|
+      content_changes = params.content_changes.map do |change|
         {change.text, change.range}
-      }
+      end
       document.update_contents(content_changes, version: params.text_document.version)
 
-      document.project?.try(&.entry_point?).try { |entry|
+      document.project?.try(&.entry_point?).try do |entry|
         @result_cache.invalidate(entry.to_s)
-      }
-    }
+      end
+    end
     @result_cache.invalidate(file_uri)
     # spawn self.compile(server, URI.parse(file_uri), in_memory: true )
   end
@@ -67,21 +68,21 @@ class Crystalline::Workspace
   end
 
   def format_document(params : LSP::DocumentFormattingParams) : {String, TextDocument}?
-    @opened_documents[params.text_document.uri]?.try { |document|
+    @opened_documents[params.text_document.uri]?.try do |document|
       {Crystal.format(document.contents), document}
-    }
+    end
   rescue e
     # swallow exceptions silently
   end
 
   def format_document(params : LSP::DocumentRangeFormattingParams) : {String, TextDocument}?
-    @opened_documents[params.text_document.uri]?.try { |document|
+    @opened_documents[params.text_document.uri]?.try do |document|
       range = params.range
       contents_lines = document.contents.lines(chomp: false)[range.start.line..range.end.line]
       contents_lines[-1] = contents_lines.last[...range.end.character] if range.end.character > 0
       contents_lines[0] = contents_lines.first[range.start.character...]
       {Crystal.format(contents_lines.join), document}
-    }
+    end
   rescue e
     # swallow exceptions silently
   end
@@ -91,9 +92,9 @@ class Crystalline::Workspace
     return unless (target = project.entry_point?)
 
     lib_path = project.default_lib_path
-    Analysis.compile(server, target, lib_path: lib_path, ignore_diagnostics: true, wants_doc: false, top_level: true, compiler_flags: project.flags).try { |result|
+    Analysis.compile(server, target, lib_path: lib_path, ignore_diagnostics: true, wants_doc: false, top_level: true, compiler_flags: project.flags).try do |result|
       project.dependencies = result.program.requires
-    }
+    end
   rescue
     nil
   end
@@ -136,6 +137,7 @@ class Crystalline::Workspace
       )
     else
       # The file is not a project dependency.
+      # ameba:disable Lint/NotNil!
       target = file_uri.not_nil!
       progress = Progress.new(
         token: "workspace/compile",
@@ -169,7 +171,7 @@ class Crystalline::Workspace
         if in_memory
           # Tell the compiler to load the opened files from memory, not from the filesystem.
           file_overrides = Hash(String, String).new
-          @opened_documents.each { |uri_str, text_document|
+          @opened_documents.each do |uri_str, text_document|
             contents = text_overrides.try(&.[uri_str]?) || text_document.contents
             contents = fix_source(contents)
 
@@ -181,7 +183,7 @@ class Crystalline::Workspace
             end
             file_path = URI.parse(uri_str).decoded_path
             file_overrides[file_path] = contents
-          }
+          end
         end
 
         lib_path = project.try(&.default_lib_path)
@@ -196,6 +198,7 @@ class Crystalline::Workspace
         if result
           if project.try(&.entry_point?)
             # Store the project dependencies.
+            # ameba:disable Lint/NotNil!
             project.not_nil!.dependencies = result.program.requires
           end
           "Completed successfully."
@@ -221,33 +224,33 @@ class Crystalline::Workspace
     if doc
       contents << "----------"
       contents << <<-MARKDOWN
-      #{doc}
-      MARKDOWN
+        #{doc}
+        MARKDOWN
     end
   end
 
   private def code_markdown(str : String?, *, language = "") : String
     if str
       <<-MARKDOWN
-      ```#{language}
-      #{str}
-      ```
-      MARKDOWN
+        ```#{language}
+        #{str}
+        ```
+        MARKDOWN
     else
       ""
     end
   end
 
   def hover(server : LSP::Server, file_uri : URI, position : LSP::Position)
-    result = self.compile(server, file_uri, in_memory: true, wants_doc: true)
+    result = compile(server, file_uri, in_memory: true, wants_doc: true)
     location = Crystal::Location.new(
       file_uri.decoded_path,
       line_number: position.line + 1,
       column_number: position.character + 1
     )
-    result.try { |r|
+    result.try do |r|
       Analysis.nodes_at_cursor(r, location)
-    }.try do |nodes, _context|
+    end.try do |nodes, _context|
       n = nodes.last?
       contents = [] of String
 
@@ -311,19 +314,20 @@ class Crystalline::Workspace
   end
 
   def definitions(server : LSP::Server, file_uri : URI, position : LSP::Position)
-    result = self.compile(server, file_uri, in_memory: true, wants_doc: true)
+    result = compile(server, file_uri, in_memory: true, wants_doc: true)
     location = Crystal::Location.new(
       file_uri.decoded_path,
       line_number: position.line + 1,
       column_number: position.character + 1
     )
-    result.try { |r|
+    result.try do |r|
       Analysis.definitions_at_cursor(r, location)
-    }.try do |definitions|
+    end.try do |definitions|
       node = definitions.node
-      definitions.locations.try &.map { |start_loc, end_loc|
+      definitions.locations.try &.map do |start_loc, end_loc|
         if node.is_a? Crystal::Path || node.is_a? Crystal::Require
           target_uri = "file://#{start_loc.original_filename}"
+          # ameba:disable Lint/NotNil!
           origin_location = node.location.not_nil!
           origin_end_location = definitions.node.end_location || Crystal::Location.new(
             file_uri.decoded_path,
@@ -355,7 +359,7 @@ class Crystalline::Workspace
             ),
           )
         end
-      }
+      end
     end
   rescue
     nil
@@ -379,25 +383,25 @@ class Crystalline::Workspace
       left_offset = position.character - prefix.size
     else
       # We need to determine which character (and by extension - autocompletion kind) is best suited depending on the location and its surroundings.
-      document_lines[position.line][0...position.character].each_char_with_index { |char, index|
+      document_lines[position.line][0...position.character].each_char_with_index do |char, index|
         unless char.ascii_alphanumeric? || char == '_' || char == '?' || char == '!'
           trigger_character = char.to_s
           left_offset = position.character - index
         end
-      }
+      end
       prefix = document_lines[position.line][0...(position.character - left_offset)]
     end
 
     suffix = document_lines[position.line][(position.character)..]?
 
     # Remove the rest of the line (or part of it) to please the parser.
-    suffix.try &.each_char_with_index { |char, index|
+    suffix.try &.each_char_with_index do |char, index|
       unless char.ascii_alphanumeric? || char == '_' || char == '?' || char == '!' || char == ':'
         truncate_line = true if char == '(' || char == '{' || char == '['
         right_offset = index
         break
       end
-    }
+    end
     suffix = suffix.try &.[right_offset...]?
 
     # LSP::Log.info { "prefix(left offset #{left_offset}): #{prefix}"}
@@ -417,7 +421,7 @@ class Crystalline::Workspace
     )
 
     # Trigger a compilation that will not fail fast.
-    result = self.compile(
+    result = compile(
       server,
       file_uri,
       in_memory: true,
@@ -452,7 +456,8 @@ class Crystalline::Workspace
 
         # We are looking for methods…
         if node_type.responds_to? :defs
-          Analysis.all_defs(node_type.not_nil!).each { |def_name, definition, owner_type, nesting|
+          # ameba:disable Lint/NotNil!
+          Analysis.all_defs(node_type.not_nil!).each do |def_name, definition, owner_type, nesting|
             owner_prefix = "*Inherited from: #{owner_type.name}*\n\n" if owner_type.responds_to? :name && owner_type != n.type
             owner_prefix ||= ""
             documentation = (owner_prefix + (definition.doc || ""))
@@ -470,16 +475,16 @@ class Crystalline::Workspace
               detail: Utils.format_def(definition),
               text_edit: text_edit,
               sort_text: (nesting + 1).chr.to_s + def_name,
-              documentation: documentation.try { |doc|
+              documentation: documentation.try do |doc|
                 LSP::MarkupContent.new(
                   kind: LSP::MarkupKind::MarkDown,
                   value: doc,
                 )
-              },
+              end,
             )
-          }
+          end
 
-          Analysis.all_macros(n.type).each { |macro_name, macro_def, owner_type, nesting|
+          Analysis.all_macros(n.type).each do |macro_name, macro_def, owner_type, nesting|
             owner_prefix = "*Inherited from: #{owner_type.name}*\n\n" if owner_type.responds_to? :name && owner_type != n.type
             owner_prefix ||= ""
             documentation = (owner_prefix + (macro_def.doc || ""))
@@ -497,14 +502,14 @@ class Crystalline::Workspace
               detail: Utils.format_def(macro_def),
               text_edit: text_edit,
               sort_text: (nesting + 1).chr.to_s + macro_name,
-              documentation: documentation.try { |doc|
+              documentation: documentation.try do |doc|
                 LSP::MarkupContent.new(
                   kind: LSP::MarkupKind::MarkDown,
                   value: doc,
                 )
-              },
+              end,
             )
-          }
+          end
         end
       when ":"
         # We are looking for module types…
@@ -517,7 +522,7 @@ class Crystalline::Workspace
         if node_type.is_a? Crystal::MetaclassType
           node_type = node_type.instance_type
 
-          Analysis.all_submodules(result, node_type).uniq(&.to_s).each { |type|
+          Analysis.all_submodules(result, node_type).uniq(&.to_s).each do |type|
             type_string = type.to_s
 
             text_edit = LSP::TextEdit.new(
@@ -529,14 +534,14 @@ class Crystalline::Workspace
               label: type_string,
               text_edit: text_edit,
               kind: Crystalline::Utils.map_completion_kind(type, default: LSP::CompletionItemKind::Module),
-              documentation: type.doc.try { |doc|
+              documentation: type.doc.try do |doc|
                 LSP::MarkupContent.new(
                   kind: LSP::MarkupKind::MarkDown,
                   value: doc,
                 )
-              },
+              end,
             )
-          }
+          end
         end
       else
         # Context autocompletion.
@@ -544,7 +549,7 @@ class Crystalline::Workspace
         if trigger_character == "@"
           context.try &.select!(&.starts_with?("@"))
         end
-        context.try &.each { |name, type|
+        context.try &.each do |name, type|
           label = "#{name} : #{type}"
           text_edit = LSP::TextEdit.new(
             range: range,
@@ -554,14 +559,14 @@ class Crystalline::Workspace
             label: label,
             text_edit: text_edit,
             kind: LSP::CompletionItemKind::Variable,
-            documentation: type.doc.try { |doc|
+            documentation: type.doc.try do |doc|
               LSP::MarkupContent.new(
                 kind: LSP::MarkupKind::MarkDown,
                 value: doc,
               )
-            },
+            end,
           )
-        }
+        end
       end
 
       selected_element_index = nil
@@ -590,15 +595,15 @@ class Crystalline::Workspace
   end
 
   def document_symbols(server : LSP::Server, file_uri : URI)
-    @opened_documents[file_uri.to_s]?.try { |text_document|
+    @opened_documents[file_uri.to_s]?.try do |text_document|
       parser = Crystal::Parser.new(fix_source(text_document.contents))
       parser.filename = file_uri.decoded_path
       parser.wants_doc = false
 
-      Analysis::DocumentSymbolsVisitor.new.tap { |visitor|
+      Analysis::DocumentSymbolsVisitor.new.tap do |visitor|
         parser.parse.accept(visitor)
-      }.symbols
-    }
+      end.symbols
+    end
   end
 
   private def fix_source(source : String) : String

@@ -34,8 +34,8 @@ class Crystalline::Controller
     @pending_requests << message.id
     case message
     when LSP::DocumentFormattingRequest
-      @documents_lock.synchronize {
-        workspace.format_document(message.params).try { |(formatted_document, document)|
+      @documents_lock.synchronize do
+        workspace.format_document(message.params).try do |(formatted_document, document)|
           range = LSP::Range.new(
             start: LSP::Position.new(line: 0, character: 0),
             end: LSP::Position.new(line: document.lines_nb + 1, character: 0),
@@ -46,34 +46,34 @@ class Crystalline::Controller
               new_text: formatted_document,
             ),
           ]
-        }
-      }
+        end
+      end
     when LSP::DocumentRangeFormattingRequest
-      @documents_lock.synchronize {
-        workspace.format_document(message.params).try { |(formatted_document, document)|
+      @documents_lock.synchronize do
+        workspace.format_document(message.params).try do |(formatted_document, document)|
           [
             LSP::TextEdit.new(
               range: message.params.range,
               new_text: formatted_document,
             ),
           ]
-        }
-      }
+        end
+      end
     when LSP::HoverRequest
       @compiler_lock.synchronize do
-        return nil unless @pending_requests.includes? message.id
+        return unless @pending_requests.includes? message.id
         file_uri = URI.parse message.params.text_document.uri
         workspace.hover(@server, file_uri, message.params.position)
       end
     when LSP::DefinitionRequest
       @compiler_lock.synchronize do
-        return nil unless @pending_requests.includes? message.id
+        return unless @pending_requests.includes? message.id
         file_uri = URI.parse message.params.text_document.uri
         workspace.definitions(@server, file_uri, message.params.position)
       end
     when LSP::CompletionRequest
       @compiler_lock.synchronize do
-        return nil unless @pending_requests.includes? message.id
+        return unless @pending_requests.includes? message.id
         file_uri = URI.parse message.params.text_document.uri
         workspace.completion(@server, file_uri, message.params.position, message.params.context.try &.trigger_character)
       end
@@ -85,13 +85,11 @@ class Crystalline::Controller
         if @server.client_capabilities.text_document.try &.document_symbol.try &.hierarchical_document_symbol_support
           document_symbols
         else
-          document_symbols.try &.reduce([] of LSP::SymbolInformation) { |acc, document_symbol|
+          document_symbols.try &.reduce([] of LSP::SymbolInformation) do |acc, document_symbol|
             acc.concat(document_symbol.to_symbol_information_array(message.params.text_document.uri))
-          }
+          end
         end
       end
-    else
-      nil
     end
   rescue e : Crystal::TypeException
     LSP::Log.warn(exception: e) { e.to_s }
@@ -106,29 +104,29 @@ class Crystalline::Controller
   def on_notification(message : LSP::NotificationMessage) : Nil
     case message
     when LSP::DidOpenNotification
-      @documents_lock.synchronize {
+      @documents_lock.synchronize do
         workspace.open_document(message.params)
-      }
+      end
     when LSP::DidChangeNotification
-      @documents_lock.synchronize {
+      @documents_lock.synchronize do
         workspace.update_document(@server, message.params)
-      }
+      end
     when LSP::DidCloseNotification
-      @documents_lock.synchronize {
+      @documents_lock.synchronize do
         workspace.close_document(@server, message.params)
-      }
+      end
     when LSP::DidSaveNotification
-      @documents_lock.synchronize {
+      @documents_lock.synchronize do
         workspace.save_document(@server, message.params)
-      }
-      @compiler_lock.synchronize {
+      end
+      @compiler_lock.synchronize do
         file_uri = message.params.text_document.uri
         workspace.compile(
           @server,
           URI.parse(file_uri),
           discard_nil_cached_result: true,
         )
-      }
+      end
     when LSP::CancelNotification
       @pending_requests.delete message.params.id
     end

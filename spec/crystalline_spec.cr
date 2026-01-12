@@ -1,5 +1,5 @@
 require "spec"
 
 it "works" do
-  true.should eq(true)
+  true.should be_true
 end

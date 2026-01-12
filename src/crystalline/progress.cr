@@ -15,15 +15,15 @@ class Crystalline::Progress
       ),
     )
 
-    create_request.on_response {
+    create_request.on_response do
       if async
-        spawn {
+        spawn do
           report_callback(server, &cb)
-        }
+        end
       else
         report_callback(server, &cb)
       end
-    }
+    end
 
     server.send(create_request)
   end

@@ -26,9 +26,9 @@ class Crystalline::TextDocument
   end
 
   def update_contents(content_changes : Array({String, LSP::Range?}), version : Number? = nil)
-    content_changes.each { |change|
+    content_changes.each do |change|
       update_contents(*change, version: version)
-    }
+    end
 
     # Check for pending changes
     loop do
@@ -65,9 +65,9 @@ class Crystalline::TextDocument
   private def partial_update(contents : String, range : LSP::Range, version : Number? = nil)
     prefix = @inner_contents[range.start.line]?.try &.[...range.start.character].chomp || ""
     suffix = @inner_contents[range.end.line]?.try &.[range.end.character..]? || @inner_contents[range.end.line]? || ""
-    replacement_lines = String.build { |str|
+    replacement_lines = String.build do |str|
       str << prefix << contents << suffix
-    }.lines(chomp: false)
+    end.lines(chomp: false)
     @inner_contents = (@inner_contents[...range.start.line]? || [] of String) + replacement_lines + (@inner_contents[range.end.line + 1...]? || [] of String)
     @version = version if version
   end

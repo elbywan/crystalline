@@ -8,7 +8,7 @@ class Crystalline::Diagnostics
 
   def append(diagnostic : LSP::Diagnostic)
     key = "file://#{diagnostic.source}"
-    self.init_value(key)
+    init_value(key)
     @diagnostics[key] << diagnostic
   end
 
@@ -33,7 +33,7 @@ class Crystalline::Diagnostics
 
     related_information = [] of LSP::DiagnosticRelatedInformation
 
-    error_stack.each_with_index { |err, i|
+    error_stack.each_with_index do |err, i|
       bottom_error = i == error_stack.size - 1
       if err.filename.is_a? Crystal::VirtualFile && (expanded_source = err.filename.as(Crystal::VirtualFile).expanded_location)
         line = expanded_source.line_number || 1
@@ -44,7 +44,7 @@ class Crystalline::Diagnostics
       end
 
       if bottom_error
-        self.append(LSP::Diagnostic.new(
+        append(LSP::Diagnostic.new(
           line: line,
           column: column,
           size: err.size || 0,
@@ -61,14 +61,14 @@ class Crystalline::Diagnostics
           filename: err.true_filename,
         )
       end
-    }
+    end
   end
 
   def publish(server : LSP::Server)
-    @diagnostics.each { |key, value|
+    @diagnostics.each do |key, value|
       server.try &.send(LSP::PublishDiagnosticsNotification.new(
         params: LSP::PublishDiagnosticsParams.new(uri: key, diagnostics: value),
       ))
-    }
+    end
   end
 end

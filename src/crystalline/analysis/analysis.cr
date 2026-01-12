@@ -25,7 +25,7 @@ module Crystalline::Analysis
         Crystal::Compiler::Source.new(file_uri.decoded_path, file.gets_to_end),
       ]
       file.close
-      self.compile(server, sources, lib_path: lib_path, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, top_level: top_level, compiler_flags: compiler_flags)
+      compile(server, sources, lib_path: lib_path, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, top_level: top_level, compiler_flags: compiler_flags)
     end
   end
 
@@ -119,18 +119,18 @@ module Crystalline::Analysis
   # Return the possible definition for the node at the given *location*.
   def self.definitions_at_cursor(result : Crystal::Compiler::Result, location : Crystal::Location) : Definitions?
     nodes, context = CursorVisitor.new(location).process(result)
-    nodes.last?.try { |node|
+    nodes.last?.try do |node|
       LSP::Log.debug { "Class of node at cursor: #{node.class} " }
       locations = begin
         if node.is_a? Crystal::Call
           if (defs = node.target_defs)
-            defs.compact_map { |d|
-              start_location = d.location.try { |loc| loc.expanded_location || loc }.not_nil!
-              end_location = d.end_location.try { |loc| loc.expanded_location || loc }.not_nil!
+            defs.compact_map do |d|
+              start_location = d.location.try { |loc| loc.expanded_location || loc }.not_nil!   # ameba:disable Lint/NotNil!
+              end_location = d.end_location.try { |loc| loc.expanded_location || loc }.not_nil! # ameba:disable Lint/NotNil!
               {start_location, end_location}
-            }
+            end
           elsif (expanded_macro = node.expanded_macro)
-            start_location = expanded_macro.location.try { |loc| loc.expanded_location || loc }.not_nil!
+            start_location = expanded_macro.location.try { |loc| loc.expanded_location || loc }.not_nil! # ameba:disable Lint/NotNil!
             end_location = expanded_macro.end_location.try { |loc| loc.expanded_location || loc } || start_location
             [{start_location, end_location}]
           end
@@ -139,14 +139,14 @@ module Crystalline::Analysis
           filename = node.string
           relative_to = location.try &.original_filename
           filenames = result.program.find_in_path(filename, relative_to)
-          filenames.try &.map { |path|
+          filenames.try &.map do |path|
             location = Crystal::Location.new(
               path,
               line_number: 1,
               column_number: 1
             )
             {location, location}
-          }
+          end
         elsif node.is_a? Crystal::Path
           Utils.locations_from_path(node, nodes)
         elsif node.is_a? Crystal::Union
@@ -172,15 +172,15 @@ module Crystalline::Analysis
       end
 
       Definitions.new(node: node, locations: locations)
-    }
+    end
   end
 
   def self.all_defs(type, *, accumulator = [] of {String, Crystal::Def, Crystal::Type, Int32}, nesting = 0)
     if type.is_a? Crystal::UnionType
       # TODO: intersection instead of union
-      type.union_types.each { |t|
+      type.union_types.each do |t|
         all_defs(t, accumulator: accumulator, nesting: nesting)
-      }
+      end
       return accumulator.uniq &.[1]
     end
 
@@ -200,7 +200,7 @@ module Crystalline::Analysis
       if type.responds_to? :instance_type
         extends_self = type.instance_type == parent
       end
-      self.all_defs(parent, accumulator: accumulator, nesting: extends_self ? nesting : nesting + 1)
+      all_defs(parent, accumulator: accumulator, nesting: extends_self ? nesting : nesting + 1)
     end
 
     accumulator
@@ -208,9 +208,9 @@ module Crystalline::Analysis
 
   def self.all_macros(type, *, accumulator = [] of {String, Crystal::Macro, Crystal::Type, Int32}, nesting = 0)
     if type.is_a? Crystal::UnionType
-      type.union_types.each { |t|
+      type.union_types.each do |t|
         all_macros(t, accumulator: accumulator, nesting: nesting)
-      }
+      end
       return accumulator.uniq &.[0]
     end
 
@@ -221,7 +221,7 @@ module Crystalline::Analysis
     end
 
     type.parents.try &.each do |parent|
-      self.all_macros(parent, accumulator: accumulator, nesting: nesting + 1)
+      all_macros(parent, accumulator: accumulator, nesting: nesting + 1)
     end
 
     accumulator

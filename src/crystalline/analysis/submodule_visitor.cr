@@ -9,9 +9,9 @@ module Crystalline::Analysis
 
     def process_result(result : Crystal::Compiler::Result)
       result.node.accept(self)
-      result.program.file_modules.each_value { |file_module|
+      result.program.file_modules.each_value do |file_module|
         process(file_module)
-      }
+      end
       @submodules
     end
 

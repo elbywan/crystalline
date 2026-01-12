@@ -120,8 +120,6 @@ class Crystalline::BrokenSourceFixer
       "rescue"
     elsif line.matches?(/\s*ensure\s*$/)
       "ensure"
-    else
-      nil
     end
   end
 

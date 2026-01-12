@@ -28,13 +28,13 @@ module Crystal
       end
 
       location = node.location
-      filename = node.string
+      node_filename = node.string
       relative_to = location.try &.original_filename
 
       # Remember that the program depends on this require
-      @program.record_require(filename, relative_to)
+      @program.record_require(node_filename, relative_to)
 
-      filenames = @program.find_in_path(filename, relative_to)
+      filenames = @program.find_in_path(node_filename, relative_to)
       if filenames
         nodes = Array(ASTNode).new(filenames.size)
         filenames.each do |filename|
@@ -71,10 +71,10 @@ module Crystal
         end
       else
         notes << <<-NOTE
-            If you're trying to require a shard:
-            - Did you remember to run `shards install`?
-            - Did you make sure you're running the compiler in the same directory as your shard.yml?
-            NOTE
+          If you're trying to require a shard:
+          - Did you remember to run `shards install`?
+          - Did you make sure you're running the compiler in the same directory as your shard.yml?
+          NOTE
       end
 
       node.raise "#{message}\n\n#{notes.join("\n")}"
@@ -121,7 +121,7 @@ module Crystal
         # give an error otherwise
         processor.check_non_nilable_class_vars_without_initializers
 
-        result = @progress_tracker.stage("Semantic (main)") do
+        @progress_tracker.stage("Semantic (main)") do
           visit_main(node, process_finished_hooks: true, cleanup: cleanup)
         end
 
@@ -134,7 +134,7 @@ module Crystal
           RecursiveStructChecker.new(self).run
         end
 
-        {result, self.error_stack.to_a}
+        node
       rescue e : Crystal::CodeError
         program.error_stack << e
         # Returns a partially typed ast.
@@ -143,8 +143,6 @@ module Crystal
         # Returns a partially typed ast.
         node
       end
-
-      node
     end
   end
 
@@ -193,9 +191,9 @@ module Crystal
     getter program : Crystal::Program
 
     def visit(node : MacroExpression)
-      previous_def.tap {
+      previous_def.tap do
         node.expanded = @last
-      }
+      end
     end
   end
 
@@ -203,7 +201,7 @@ module Crystal
     # Adds functionality to get the CRYSTAL_PATH value, but without the default
     # library directory.
     def self.default_path_without_lib
-      parts = self.default_path.split(Process::PATH_DELIMITER)
+      parts = default_path.split(Process::PATH_DELIMITER)
       parts.select(&.!=(DEFAULT_LIB_PATH)).join(Process::PATH_DELIMITER)
     end
   end

@@ -33,9 +33,9 @@ module Crystalline::Analysis
     private def nearest_end_location(node)
       return node.end_location if node.end_location
 
-      @nodes.reverse.find { |elt|
+      @nodes.reverse.find do |elt|
         elt.responds_to?(:end_location) && elt.end_location
-      }.try &.end_location
+      end.try &.end_location
     end
 
     def visit_any(node : Crystal::Def | Crystal::Assign | Crystal::Block)
