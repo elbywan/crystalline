@@ -1,7 +1,8 @@
 module GC
   def self.init
-    # LibGC.set_free_space_divisor(10)
-    # LibGC.set_force_unmap_on_gcollect(1)
+    LibGC.set_free_space_divisor(10)
+    LibGC.set_force_unmap_on_gcollect(1)
+    LibGC.enable_incremental
     previous_def
   end
 end

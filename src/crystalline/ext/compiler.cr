@@ -134,17 +134,15 @@ module Crystal
           RecursiveStructChecker.new(self).run
         end
 
-        {result, self.error_stack.to_a}
+        result
       rescue e : Crystal::CodeError
-        program.error_stack << e
+        @error_stack << e
         # Returns a partially typed ast.
         node
       rescue
         # Returns a partially typed ast.
         node
       end
-
-      node
     end
   end
 

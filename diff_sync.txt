@@ -1,0 +1,293 @@
+diff --git a/spec/reproduction_41_spec.cr b/spec/reproduction_41_spec.cr
+new file mode 100644
+index 0000000..cb19d0d
+--- /dev/null
++++ b/spec/reproduction_41_spec.cr
+@@ -0,0 +1,43 @@
++require "spec"
++require "../src/crystalline/requires"
++require "../src/crystalline/*"
++require "lsp/base/range"
++
++describe Crystalline::TextDocument do
++  it "reproduces #41: does not strip newlines during incremental updates" do
++    initial_content = "def foo\nend\n"
++    doc = Crystalline::TextDocument.new(URI.parse("file:///test.cr"), nil, initial_content)
++    doc.contents.should eq(initial_content)
++
++    # Simulation: Append a space at the end of the first line (before the newline)
++    # Line 0 is "def foo\n" (length 8)
++    # We edit at position line 0, character 7 (right after 'o', before '\n')
++    range = LSP::Range.new(
++      start: LSP::Position.new(line: 0, character: 7),
++      end: LSP::Position.new(line: 0, character: 7)
++    )
++    doc.update_contents([{" ", range}], version: 1)
++
++    # Expected: "def foo \nend\n"
++    # If .chomp is the culprit, it might still work here because prefix is "def foo"
++    doc.contents.should eq("def foo \nend\n")
++
++    # Simulation: Edit AT the newline position
++    # "def foo \nend\n"
++    # Line 0 is now "def foo \n" (length 9)
++    # Let's say we append something at the very end of the line (character 9)
++    range = LSP::Range.new(
++      start: LSP::Position.new(line: 0, character: 9),
++      end: LSP::Position.new(line: 0, character: 9)
++    )
++    doc.update_contents([{"\n# comment", range}], version: 2)
++
++    # Expected: "def foo \n\n# commentend\n" (wait, character 9 is after \n)
++    # Let's check what actually happens.
++    # If line[...9] is "def foo \n", then .chomp makes it "def foo "
++    # Then we add "\n# comment"
++    # Result: "def foo \n# commentend\n"
++    # The original \n at index 8 is LOST if chomp is used on the prefix.
++    doc.contents.should eq("def foo \n\n# commentend\n")
++  end
++end
+diff --git a/spec/reproduction_63_spec.cr b/spec/reproduction_63_spec.cr
+new file mode 100644
+index 0000000..6e51e49
+--- /dev/null
++++ b/spec/reproduction_63_spec.cr
+@@ -0,0 +1,65 @@
++require "spec"
++require "lsp/server"
++require "lsp/notifications/text_synchronization/did_change"
++require "lsp/notifications/text_synchronization/did_open"
++require "lsp/requests/language_features/formatting"
++require "lsp/requests/language_features/range_formatting"
++require "../src/crystalline/requires"
++require "../src/crystalline/*"
++
++class FakeServer < LSP::Server
++  @client_capabilities = LSP::ClientCapabilities.new
++  def initialize; super(IO::Memory.new, IO::Memory.new); end
++  def client_capabilities : LSP::ClientCapabilities; @client_capabilities; end
++end
++
++describe Crystalline::Workspace do
++  it "reproduces #63: range formatting does not add extra newlines" do
++    server = FakeServer.new
++    workspace = Crystalline::Workspace.new(server, "file://#{Dir.current}")
++
++    file_uri = URI.parse("file://#{Dir.current}/test_paste.cr")
++    initial_content = "foo \"bar\"\n"
++    
++    workspace.open_document(LSP::DidOpenTextDocumentParams.new(
++      text_document: LSP::TextDocumentItem.new(
++        uri: file_uri.to_s,
++        language_id: "crystal",
++        version: 1,
++        text: initial_content
++      )
++    ))
++
++    # Let's simulate the range formatting request.
++    range = LSP::Range.new(
++      start: LSP::Position.new(line: 0, character: 5),
++      end: LSP::Position.new(line: 0, character: 9)
++    )
++    
++    params = LSP::DocumentRangeFormattingParams.new(
++      text_document: LSP::TextDocumentIdentifier.new(uri: file_uri.to_s),
++      range: range,
++      options: LSP::FormattingOptions.new(tab_size: 2, insert_spaces: true)
++    )
++
++    # Update the document to reflect the paste
++    workspace.update_document(server, LSP::DidChangeTextDocumentParams.new(
++      text_document: LSP::VersionedTextDocumentIdentifier.new(uri: file_uri.to_s, version: 2),
++      content_changes: [
++        LSP::DidChangeTextDocumentParams::TextDocumentContentChangeEvent.new(
++          range: LSP::Range.new(
++            start: LSP::Position.new(line: 0, character: 5),
++            end: LSP::Position.new(line: 0, character: 5)
++          ),
++          text: "text"
++        )
++      ]
++    ))
++
++    result = workspace.format_document(params)
++    result.should_not be_nil
++    formatted_text, _ = result.not_nil!
++    
++    formatted_text.should eq("text")
++  end
++end
+diff --git a/spec/reproduction_76_spec.cr b/spec/reproduction_76_spec.cr
+new file mode 100644
+index 0000000..d2d7e4a
+--- /dev/null
++++ b/spec/reproduction_76_spec.cr
+@@ -0,0 +1,51 @@
++require "spec"
++require "../src/crystalline/requires"
++require "../src/crystalline/*"
++require "lsp/server"
++
++# Mock server to provide client capabilities without handshake
++class FakeServer < LSP::Server
++  @client_capabilities = LSP::ClientCapabilities.new
++
++  def initialize
++    super(IO::Memory.new, IO::Memory.new)
++  end
++
++  def client_capabilities : LSP::ClientCapabilities
++    @client_capabilities
++  end
++end
++
++describe Crystalline::Workspace do
++  it "reproduces #76: does not trigger completion inside comments" do
++    server = FakeServer.new
++    workspace = Crystalline::Workspace.new(server, "file://#{Dir.current}")
++
++    file_uri = URI.parse("file://#{Dir.current}/test_comment.cr")
++    # A file with a dot inside a comment
++    content = <<-CRYSTAL
++    # This is a comment.
++    puts 1
++    CRYSTAL
++
++    workspace.open_document(LSP::DidOpenTextDocumentParams.new(
++      text_document: LSP::TextDocumentItem.new(
++        uri: file_uri.to_s,
++        language_id: "crystal",
++        version: 1,
++        text: content
++      )
++    ))
++
++    # Try to trigger completion at the dot in the comment
++    # Line 0, character 19 (the dot at the end of "comment.")
++    pos = LSP::Position.new(line: 0, character: 19)
++
++    # Currently, it might still return something or try to compile it.
++    # We want to verify that our fix prevents this.
++    result = workspace.completion(server, file_uri, pos, ".")
++
++    # If it is NOT in a comment, it should return nil (expected behavior for the fix)
++    result.should be_nil
++  end
++end
+diff --git a/src/crystalline/main.cr b/src/crystalline/main.cr
+index 8e44cb7..51645e9 100644
+--- a/src/crystalline/main.cr
++++ b/src/crystalline/main.cr
+@@ -44,10 +44,12 @@ module Crystalline
+     end
+   end
+ 
+-  def self.init(*, input : IO = STDIN, output : IO = STDOUT)
++  def self.init(*, input : IO = STDIN, output : IO = STDOUT, skip_log : Bool = false)
+     EnvironmentConfig.run
+     {% if flag?(:debug) %}
+-      ::Log.setup(:debug, LSP::Log.backend.not_nil!)
++      unless skip_log
++        ::Log.setup(:debug, LSP::Log.backend.not_nil!)
++      end
+     {% end %}
+     server = LSP::Server.new(input, output, SERVER_CAPABILITIES)
+     Controller.new(server)
+diff --git a/src/crystalline/text_document.cr b/src/crystalline/text_document.cr
+index 411a50e..cfc1fa7 100644
+--- a/src/crystalline/text_document.cr
++++ b/src/crystalline/text_document.cr
+@@ -63,7 +63,7 @@ class Crystalline::TextDocument
+   end
+ 
+   private def partial_update(contents : String, range : LSP::Range, version : Number? = nil)
+-    prefix = @inner_contents[range.start.line]?.try &.[...range.start.character].chomp || ""
++    prefix = @inner_contents[range.start.line]?.try &.[...range.start.character] || ""
+     suffix = @inner_contents[range.end.line]?.try &.[range.end.character..]? || @inner_contents[range.end.line]? || ""
+     replacement_lines = String.build { |str|
+       str << prefix << contents << suffix
+diff --git a/src/crystalline/workspace.cr b/src/crystalline/workspace.cr
+index c02f195..0a12b94 100644
+--- a/src/crystalline/workspace.cr
++++ b/src/crystalline/workspace.cr
+@@ -68,22 +68,42 @@ class Crystalline::Workspace
+ 
+   def format_document(params : LSP::DocumentFormattingParams) : {String, TextDocument}?
+     @opened_documents[params.text_document.uri]?.try { |document|
+-      {Crystal.format(document.contents), document}
++      contents = document.contents
++      return if contents.blank?
++      formatted = Crystal.format(contents)
++      # Basic safety check: if formatting returned an empty string but the original wasn't empty,
++      # something went wrong. Also check for basic syntax validity of the result.
++      Crystal::Parser.parse(formatted)
++      {formatted, document}
+     }
+   rescue e
+-    # swallow exceptions silently
++    # LSP::Log.warn { "Formatting failed for #{params.text_document.uri}: #{e.message}" }
++    nil
+   end
+ 
+   def format_document(params : LSP::DocumentRangeFormattingParams) : {String, TextDocument}?
+     @opened_documents[params.text_document.uri]?.try { |document|
+       range = params.range
+       contents_lines = document.contents.lines(chomp: false)[range.start.line..range.end.line]
++      return if contents_lines.empty?
++
+       contents_lines[-1] = contents_lines.last[...range.end.character] if range.end.character > 0
+       contents_lines[0] = contents_lines.first[range.start.character...]
+-      {Crystal.format(contents_lines.join), document}
++
++      target = contents_lines.join
++      return if target.blank?
++
++      formatted = Crystal.format(target)
++      # For range formatting, we might not be able to parse the fragment alone,
++      # but we can check if it's empty.
++      # Also chomp the result because Crystal.format always adds a trailing newline.
++      return if formatted.blank?
++
++      {formatted.chomp, document}
+     }
+   rescue e
+-    # swallow exceptions silently
++    # LSP::Log.warn { "Range formatting failed for #{params.text_document.uri}: #{e.message}" }
++    nil
+   end
+ 
+   # Run a top level semantic analysis to compute dependencies.
+@@ -365,6 +385,32 @@ class Crystalline::Workspace
+     text_document = @opened_documents[file_uri.to_s]?
+     return unless text_document
+ 
++    # Check if we are inside a comment.
++    current_line = text_document.contents.lines(chomp: false)[position.line]?
++    if current_line
++      lexer = Crystal::Lexer.new(current_line)
++      loop do
++        token = lexer.next_token
++        break if token.type == :EOF
++        
++        # Lexer column_number is 1-based. Position character is 0-based.
++        # If the token starts after our cursor, we stop.
++        if (loc = token.location)
++          break if loc.column_number > position.character + 1
++        end
++
++        if token.type == :COMMENT
++          # If the cursor is within the range of this comment token.
++          if (loc = token.location)
++            token_start = loc.column_number - 1
++            if position.character >= token_start
++              return nil
++            end
++          end
++        end
++      end
++    end
++
+     # LSP::Log.info { "completion: #{trigger_character}"}
+ 
+     document_lines = fix_source(text_document.contents).lines(chomp: false)
