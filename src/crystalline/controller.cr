@@ -34,60 +34,72 @@ class Crystalline::Controller
     @pending_requests << message.id
     case message
     when LSP::DocumentFormattingRequest
-      @documents_lock.synchronize {
-        workspace.format_document(message.params).try { |(formatted_document, document)|
-          range = LSP::Range.new(
-            start: LSP::Position.new(line: 0, character: 0),
-            end: LSP::Position.new(line: document.lines_nb + 1, character: 0),
-          )
-          [
-            LSP::TextEdit.new(
-              range: range,
-              new_text: formatted_document,
-            ),
-          ]
+      Utils.with_timeout(15.seconds) do
+        @documents_lock.synchronize {
+          workspace.format_document(message.params).try { |(formatted_document, document)|
+            range = LSP::Range.new(
+              start: LSP::Position.new(line: 0, character: 0),
+              end: LSP::Position.new(line: document.lines_nb + 1, character: 0),
+            )
+            [
+              LSP::TextEdit.new(
+                range: range,
+                new_text: formatted_document,
+              ),
+            ]
+          }
         }
-      }
+      end
     when LSP::DocumentRangeFormattingRequest
-      @documents_lock.synchronize {
-        workspace.format_document(message.params).try { |(formatted_document, document)|
-          [
-            LSP::TextEdit.new(
-              range: message.params.range,
-              new_text: formatted_document,
-            ),
-          ]
+      Utils.with_timeout(15.seconds) do
+        @documents_lock.synchronize {
+          workspace.format_document(message.params).try { |(formatted_document, document)|
+            [
+              LSP::TextEdit.new(
+                range: message.params.range,
+                new_text: formatted_document,
+              ),
+            ]
+          }
         }
-      }
+      end
     when LSP::HoverRequest
-      @compiler_lock.synchronize do
-        return nil unless @pending_requests.includes? message.id
-        file_uri = URI.parse message.params.text_document.uri
-        workspace.hover(@server, file_uri, message.params.position)
+      Utils.with_timeout(30.seconds) do
+        @compiler_lock.synchronize do
+          return nil unless @pending_requests.includes? message.id
+          file_uri = URI.parse message.params.text_document.uri
+          workspace.hover(@server, file_uri, message.params.position)
+        end
       end
     when LSP::DefinitionRequest
-      @compiler_lock.synchronize do
-        return nil unless @pending_requests.includes? message.id
-        file_uri = URI.parse message.params.text_document.uri
-        workspace.definitions(@server, file_uri, message.params.position)
+      Utils.with_timeout(30.seconds) do
+        @compiler_lock.synchronize do
+          return nil unless @pending_requests.includes? message.id
+          file_uri = URI.parse message.params.text_document.uri
+          workspace.definitions(@server, file_uri, message.params.position)
+        end
       end
     when LSP::CompletionRequest
-      @compiler_lock.synchronize do
-        return nil unless @pending_requests.includes? message.id
-        file_uri = URI.parse message.params.text_document.uri
-        workspace.completion(@server, file_uri, message.params.position, message.params.context.try &.trigger_character)
+      Utils.with_timeout(30.seconds) do
+        @compiler_lock.synchronize do
+          return nil unless @pending_requests.includes? message.id
+          file_uri = URI.parse message.params.text_document.uri
+          workspace.completion(@server, file_uri, message.params.position, message.params.context.try &.trigger_character)
+        end
       end
     when LSP::DocumentSymbolsRequest
-      @documents_lock.synchronize do
-        file_uri = URI.parse message.params.text_document.uri
-        document_symbols = workspace.document_symbols(@server, file_uri)
+      Utils.with_timeout(30.seconds) do
+        @documents_lock.synchronize do
+          file_uri = URI.parse message.params.text_document.uri
+          document_symbols = workspace.document_symbols(@server, file_uri)
 
-        if @server.client_capabilities.text_document.try &.document_symbol.try &.hierarchical_document_symbol_support
-          document_symbols
-        else
-          document_symbols.try &.reduce([] of LSP::SymbolInformation) { |acc, document_symbol|
-            acc.concat(document_symbol.to_symbol_information_array(message.params.text_document.uri))
-          }
+          if @server.client_capabilities.text_document.try &.document_symbol.try &.hierarchical_document_symbol_support
+            document_symbols
+          else
+            document_symbols.try &.reduce([] of LSP::SymbolInformation) { |acc, document_symbol|
+              acc.concat(document_symbol.to_symbol_information_array(message.params.text_document.uri))
+            }
+          end
         end
       end
     else

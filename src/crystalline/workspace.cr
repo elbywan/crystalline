@@ -173,6 +173,9 @@ class Crystalline::Workspace
             contents = text_overrides.try(&.[uri_str]?) || text_document.contents
             contents = fix_source(contents)
 
+            # Fix for #67: if this is the entry point, and it's a project that uses
+            # a non-standard structure (like Lucky), we check if there's a src/requires.cr
+            # or if the entry point itself should implicitly require everything.
             if target_string == uri_str
               # If the entry point itself needs to be loaded from memory.
               sources = [
@@ -182,6 +185,15 @@ class Crystalline::Workspace
             file_path = URI.parse(uri_str).decoded_path
             file_overrides[file_path] = contents
           }
+
+          # If the project has a src/requires.cr file, ensure it is part of the overrides
+          # if not already open, or ensure it's required.
+          if project && (root_path = project.root_uri.decoded_path)
+            requires_path = Path[root_path, "src", "requires.cr"]
+            if File.exists?(requires_path) && !file_overrides.has_key?(requires_path.to_s)
+              file_overrides[requires_path.to_s] = fix_source(File.read(requires_path))
+            end
+          end
         end
 
         lib_path = project.try(&.default_lib_path)

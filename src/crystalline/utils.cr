@@ -1,4 +1,22 @@
 module Crystalline::Utils
+  # Run a block with a timeout.
+  def self.with_timeout(timeout : Time::Span, &block)
+    channel = Channel(typeof(yield)).new
+    spawn do
+      channel.send(yield)
+    rescue e
+      # We don't want to crash the whole server if the block crashes.
+      LSP::Log.error { "Error in timed block: #{e.message}" }
+    end
+
+    select
+    when result = channel.receive
+      result
+    when timeout(timeout)
+      nil
+    end
+  end
+
   def self.map_completion_kind(kind, *, default = LSP::CompletionItemKind::Variable)
     case kind
     when Crystal::FileModule
