@@ -89,11 +89,16 @@ class Crystalline::Workspace
   def format_document(params : LSP::DocumentRangeFormattingParams) : {String, TextDocument}?
     @opened_documents[params.text_document.uri]?.try { |document|
       range = params.range
-      contents_lines = document.contents.lines(chomp: false)[range.start.line..range.end.line]
-      return if contents_lines.empty?
+      contents_lines = document.contents.lines(chomp: false)[range.start.line..range.end.line]?
+      return if contents_lines.nil? || contents_lines.empty?
 
-      contents_lines[-1] = contents_lines.last[...range.end.character] if range.end.character > 0
-      contents_lines[0] = contents_lines.first[range.start.character...]
+      last_line = contents_lines.last
+      end_char = Math.min(range.end.character, last_line.size)
+      contents_lines[-1] = last_line[...end_char]
+
+      first_line = contents_lines.first
+      start_char = Math.min(range.start.character, first_line.size)
+      contents_lines[0] = first_line[start_char...]
 
       target = contents_lines.join
       return if target.blank?
@@ -101,9 +106,10 @@ class Crystalline::Workspace
       formatted = Crystal.format(target)
       # For range formatting, we might not be able to parse the fragment alone,
       # but we can check if it's empty.
+      # Also chomp the result because Crystal.format always adds a trailing newline.
       return if formatted.blank?
 
-      {formatted, document}
+      {formatted.chomp, document}
     }
   rescue e
     LSP::Log.warn { "Range formatting failed for #{params.text_document.uri}: #{e.message}" }
