@@ -175,13 +175,33 @@ class Crystalline::Workspace
 
             if target_string == uri_str
               # If the entry point itself needs to be loaded from memory.
+              # Fix for #67: if the project has a src/requires.cr file, ensure it is part of the overrides
+              # and implicitly require it in the entry point to force discovery of classes.
+              if project && (root_path = project.root_uri.decoded_path)
+                requires_path = Path[root_path, "src", "requires.cr"]
+                if File.exists?(requires_path)
+                  # Prepend the require to the entry point source.
+                  # We use a relative path from the entry point to src/requires.cr.
+                  entry_path = Path[URI.parse(uri_str).decoded_path]
+                  begin
+                    rel_requires = requires_path.relative_to(entry_path.parent)
+                    contents = "require \"#{rel_requires}\"\n" + contents
+                  rescue
+                    # Fallback to absolute path if relative fails.
+                    contents = "require \"#{requires_path}\"\n" + contents
+                  end
+                  
+                  # Also ensure requires.cr is in file_overrides.
+                  if !file_overrides.has_key?(requires_path.to_s)
+                    file_overrides[requires_path.to_s] = fix_source(File.read(requires_path))
+                  end
+                end
+              end
+
               sources = [
                 Crystal::Compiler::Source.new(target.decoded_path, contents),
               ]
             end
-            file_path = URI.parse(uri_str).decoded_path
-            file_overrides[file_path] = contents
-          }
         end
 
         lib_path = project.try(&.default_lib_path)
