@@ -368,26 +368,39 @@ class Crystalline::Workspace
     # Check if we are inside a comment.
     current_line = text_document.contents.lines(chomp: false)[position.line]?
     if current_line
-      lexer = Crystal::Lexer.new(current_line)
-      loop do
-        token = lexer.next_token
-        break if token.type == :EOF
-        
-        # Lexer column_number is 1-based. Position character is 0-based.
-        # If the token starts after our cursor, we stop.
-        if (loc = token.location)
-          break if loc.column_number > position.character + 1
-        end
+      # Convert UTF-16 character position to byte offset for the lexer.
+      byte_offset = 0
+      char_offset = 0
+      current_line.each_char do |char|
+        break if char_offset >= position.character
+        byte_offset += char.bytesize
+        char_offset += 1
+      end
+      # Lexer column numbers are 1-based byte offsets.
+      lexer_column = byte_offset + 1
 
-        if token.type == :COMMENT
-          # If the cursor is within the range of this comment token.
+      lexer = Crystal::Lexer.new(current_line)
+      begin
+        loop do
+          token = lexer.next_token
+          break if token.type == :EOF
+          
           if (loc = token.location)
-            token_start = loc.column_number - 1
-            if position.character >= token_start
-              return nil
+            break if loc.column_number > lexer_column
+          end
+
+          if token.type == :COMMENT
+            if (loc = token.location)
+              token_start = loc.column_number
+              # If the cursor is at or after the start of the comment.
+              if lexer_column >= token_start
+                return nil
+              end
             end
           end
         end
+      rescue Crystal::SyntaxException
+        # Ignore syntax errors while typing
       end
     end
 
