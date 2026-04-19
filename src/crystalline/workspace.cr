@@ -372,15 +372,20 @@ class Crystalline::Workspace
       loop do
         token = lexer.next_token
         break if token.type == :EOF
-        # If the token starts after our trigger character, we stop.
-        break if token.location.not_nil!.column_number > position.character
         
+        # Lexer column_number is 1-based. Position character is 0-based.
+        # If the token starts after our cursor, we stop.
+        if (loc = token.location)
+          break if loc.column_number > position.character + 1
+        end
+
         if token.type == :COMMENT
           # If the cursor is within the range of this comment token.
-          token_start = token.location.not_nil!.column_number
-          # Lexer column numbers are 1-based. Position character is 0-based.
-          if position.character >= token_start - 1
-            return nil
+          if (loc = token.location)
+            token_start = loc.column_number - 1
+            if position.character >= token_start
+              return nil
+            end
           end
         end
       end
