@@ -47,9 +47,8 @@ module Crystalline
   def self.init(*, input : IO = STDIN, output : IO = STDOUT, log_level : ::Log::Severity = :warn)
     EnvironmentConfig.run
 
-    ::Log.setup(log_level, LSP::Log.backend.not_nil!)
-
     server = LSP::Server.new(input, output, SERVER_CAPABILITIES)
+    ::Log.setup(log_level, LSP::Log.backend.not_nil!)
     Controller.new(server)
   rescue ex
     LSP::Log.error(exception: ex) { %(#{ex.message || "Unknown error during init."}\n#{ex.backtrace.join('\n')}) }
