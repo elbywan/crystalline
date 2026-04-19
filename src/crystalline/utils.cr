@@ -7,10 +7,12 @@ module Crystalline::Utils
     rescue e
       # We don't want to crash the whole server if the block crashes.
       LSP::Log.error { "Error in timed block: #{e.message}" }
+    ensure
+      channel.close
     end
 
     select
-    when result = channel.receive
+    when result = channel.receive?
       result
     when timeout(timeout)
       nil
