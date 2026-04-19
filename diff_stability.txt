@@ -1,0 +1,363 @@
+diff --git a/src/crystalline.cr b/src/crystalline.cr
+index ae14682..6208d0e 100644
+--- a/src/crystalline.cr
++++ b/src/crystalline.cr
+@@ -1,9 +1,39 @@
+ require "./crystalline/requires"
+ require "./crystalline/*"
++require "option_parser"
+ 
+-if ARGV.includes?("--version")
+-  puts(Crystalline::VERSION)
+-  exit
++log_level = :warn
++
++OptionParser.parse do |parser|
++  parser.banner = "Usage: crystalline [options]"
++
++  parser.on("-v", "--version", "Show version") do
++    puts Crystalline::VERSION
++    exit
++  end
++
++  parser.on("-h", "--help", "Show help") do
++    puts parser
++    exit
++  end
++
++  parser.on("-l LEVEL", "--log LEVEL", "Set log level (debug, info, warn, error). Default: warn") do |level|
++    log_level = case level.downcase
++                when "debug" then :debug
++                when "info"  then :info
++                when "warn"  then :warn
++                when "error" then :error
++                else
++                  STDERR.puts "Invalid log level: #{level}"
++                  exit 1
++                end
++  end
++
++  parser.invalid_option do |flag|
++    STDERR.puts "ERROR: #{flag} is not a valid option."
++    STDERR.puts parser
++    exit 1
++  end
+ end
+ 
+-Crystalline.init
++Crystalline.init(log_level: log_level)
+diff --git a/src/crystalline/controller.cr b/src/crystalline/controller.cr
+index 7ff74db..316da93 100644
+--- a/src/crystalline/controller.cr
++++ b/src/crystalline/controller.cr
+@@ -34,60 +34,72 @@ class Crystalline::Controller
+     @pending_requests << message.id
+     case message
+     when LSP::DocumentFormattingRequest
+-      @documents_lock.synchronize {
+-        workspace.format_document(message.params).try { |(formatted_document, document)|
+-          range = LSP::Range.new(
+-            start: LSP::Position.new(line: 0, character: 0),
+-            end: LSP::Position.new(line: document.lines_nb + 1, character: 0),
+-          )
+-          [
+-            LSP::TextEdit.new(
+-              range: range,
+-              new_text: formatted_document,
+-            ),
+-          ]
++      Utils.with_timeout(15.seconds) do
++        @documents_lock.synchronize {
++          workspace.format_document(message.params).try { |(formatted_document, document)|
++            range = LSP::Range.new(
++              start: LSP::Position.new(line: 0, character: 0),
++              end: LSP::Position.new(line: document.lines_nb + 1, character: 0),
++            )
++            [
++              LSP::TextEdit.new(
++                range: range,
++                new_text: formatted_document,
++              ),
++            ]
++          }
+         }
+-      }
++      end
+     when LSP::DocumentRangeFormattingRequest
+-      @documents_lock.synchronize {
+-        workspace.format_document(message.params).try { |(formatted_document, document)|
+-          [
+-            LSP::TextEdit.new(
+-              range: message.params.range,
+-              new_text: formatted_document,
+-            ),
+-          ]
++      Utils.with_timeout(15.seconds) do
++        @documents_lock.synchronize {
++          workspace.format_document(message.params).try { |(formatted_document, document)|
++            [
++              LSP::TextEdit.new(
++                range: message.params.range,
++                new_text: formatted_document,
++              ),
++            ]
++          }
+         }
+-      }
++      end
+     when LSP::HoverRequest
+-      @compiler_lock.synchronize do
+-        return nil unless @pending_requests.includes? message.id
+-        file_uri = URI.parse message.params.text_document.uri
+-        workspace.hover(@server, file_uri, message.params.position)
++      Utils.with_timeout(30.seconds) do
++        @compiler_lock.synchronize do
++          return nil unless @pending_requests.includes? message.id
++          file_uri = URI.parse message.params.text_document.uri
++          workspace.hover(@server, file_uri, message.params.position)
++        end
+       end
+     when LSP::DefinitionRequest
+-      @compiler_lock.synchronize do
+-        return nil unless @pending_requests.includes? message.id
+-        file_uri = URI.parse message.params.text_document.uri
+-        workspace.definitions(@server, file_uri, message.params.position)
++      Utils.with_timeout(30.seconds) do
++        @compiler_lock.synchronize do
++          return nil unless @pending_requests.includes? message.id
++          file_uri = URI.parse message.params.text_document.uri
++          workspace.definitions(@server, file_uri, message.params.position)
++        end
+       end
+     when LSP::CompletionRequest
+-      @compiler_lock.synchronize do
+-        return nil unless @pending_requests.includes? message.id
+-        file_uri = URI.parse message.params.text_document.uri
+-        workspace.completion(@server, file_uri, message.params.position, message.params.context.try &.trigger_character)
++      Utils.with_timeout(30.seconds) do
++        @compiler_lock.synchronize do
++          return nil unless @pending_requests.includes? message.id
++          file_uri = URI.parse message.params.text_document.uri
++          workspace.completion(@server, file_uri, message.params.position, message.params.context.try &.trigger_character)
++        end
+       end
+     when LSP::DocumentSymbolsRequest
+-      @documents_lock.synchronize do
+-        file_uri = URI.parse message.params.text_document.uri
+-        document_symbols = workspace.document_symbols(@server, file_uri)
++      Utils.with_timeout(30.seconds) do
++        @documents_lock.synchronize do
++          file_uri = URI.parse message.params.text_document.uri
++          document_symbols = workspace.document_symbols(@server, file_uri)
+ 
+-        if @server.client_capabilities.text_document.try &.document_symbol.try &.hierarchical_document_symbol_support
+-          document_symbols
+-        else
+-          document_symbols.try &.reduce([] of LSP::SymbolInformation) { |acc, document_symbol|
+-            acc.concat(document_symbol.to_symbol_information_array(message.params.text_document.uri))
+-          }
++          if @server.client_capabilities.text_document.try &.document_symbol.try &.hierarchical_document_symbol_support
++            document_symbols
++          else
++            document_symbols.try &.reduce([] of LSP::SymbolInformation) { |acc, document_symbol|
++              acc.concat(document_symbol.to_symbol_information_array(message.params.text_document.uri))
++            }
++          end
+         end
+       end
+     else
+diff --git a/src/crystalline/ext/boehm.cr b/src/crystalline/ext/boehm.cr
+index 0911252..4fa2f9e 100644
+--- a/src/crystalline/ext/boehm.cr
++++ b/src/crystalline/ext/boehm.cr
+@@ -1,7 +1,8 @@
+ module GC
+   def self.init
+-    # LibGC.set_free_space_divisor(10)
+-    # LibGC.set_force_unmap_on_gcollect(1)
++    LibGC.set_free_space_divisor(10)
++    LibGC.set_force_unmap_on_gcollect(1)
++    LibGC.enable_incremental
+     previous_def
+   end
+ end
+diff --git a/src/crystalline/ext/compiler.cr b/src/crystalline/ext/compiler.cr
+index b4e84fb..4e2367a 100644
+--- a/src/crystalline/ext/compiler.cr
++++ b/src/crystalline/ext/compiler.cr
+@@ -134,17 +134,15 @@ module Crystal
+           RecursiveStructChecker.new(self).run
+         end
+ 
+-        {result, self.error_stack.to_a}
++        result
+       rescue e : Crystal::CodeError
+-        program.error_stack << e
++        @error_stack << e
+         # Returns a partially typed ast.
+         node
+       rescue
+         # Returns a partially typed ast.
+         node
+       end
+-
+-      node
+     end
+   end
+ 
+diff --git a/src/crystalline/main.cr b/src/crystalline/main.cr
+index 8e44cb7..addc652 100644
+--- a/src/crystalline/main.cr
++++ b/src/crystalline/main.cr
+@@ -44,11 +44,11 @@ module Crystalline
+     end
+   end
+ 
+-  def self.init(*, input : IO = STDIN, output : IO = STDOUT)
++  def self.init(*, input : IO = STDIN, output : IO = STDOUT, log_level : ::Log::Severity = :warn)
+     EnvironmentConfig.run
+-    {% if flag?(:debug) %}
+-      ::Log.setup(:debug, LSP::Log.backend.not_nil!)
+-    {% end %}
++
++    ::Log.setup(log_level, LSP::Log.backend.not_nil!)
++
+     server = LSP::Server.new(input, output, SERVER_CAPABILITIES)
+     Controller.new(server)
+   rescue ex
+diff --git a/src/crystalline/project.cr b/src/crystalline/project.cr
+index fc5e694..2974610 100644
+--- a/src/crystalline/project.cr
++++ b/src/crystalline/project.cr
+@@ -40,36 +40,50 @@ class Crystalline::Project
+ 
+   # Finds and returns an array of all projects in the workspace root.
+   def self.find_in_workspace_root(workspace_root_uri : URI) : Array(Project)
+-    root_project = Project.new(workspace_root_uri)
+-    # First, check for a Crystalline project file.
+-    begin
+-      path = Path[workspace_root_uri.decoded_path, "shard.yml"]
+-      shards_yaml = File.open(path) do |file|
+-        YAML.parse(file)
+-      end
++    projects = [] of Project
++    root_path = workspace_root_uri.decoded_path
+ 
+-      projects = shards_yaml.dig?("crystalline", "projects").try do |pjs|
+-        Dir.glob(pjs.as_a.map(&.as_s)).reduce([] of Project) do |acc, match|
+-          path = Path.new(match)
++    # Check the root itself.
++    if File.exists?(Path[root_path, "shard.yml"])
++      projects << Project.new(workspace_root_uri)
++    end
+ 
+-          is_directory = File.directory?(path)
+-          has_shard_yml = is_directory && File.exists?(Path[path, "shard.yml"])
+-          is_not_lib = has_shard_yml && path.parent != "lib"
++    # Search recursively for shard.yml files, ignoring the 'lib' folder.
++    Dir.glob(Path[root_path, "**", "shard.yml"].to_s).each do |shard_path|
++      path = Path[shard_path].parent
++      # Skip if it's in a 'lib' directory.
++      next if path.parts.includes?("lib")
++      # Skip if it's the root path (already added).
++      next if path.to_s == root_path
++
++      projects << Project.new(URI.parse("file://#{path}"))
++    end
+ 
+-          if is_directory && has_shard_yml && is_not_lib
+-            normalized_path = Path[workspace_root_uri.decoded_path, path].normalize
+-            acc << Project.new(URI.parse("file://#{normalized_path}"))
+-          else
+-            acc
++    # If we found an explicit list of projects in the root shard.yml, use that instead.
++    begin
++      path = Path[root_path, "shard.yml"]
++      shards_yaml = File.open(path) { |file| YAML.parse(file) }
++      explicit_projects = shards_yaml.dig?("crystalline", "projects").try &.as_a.map(&.as_s)
++      if explicit_projects
++        projects = explicit_projects.reduce([] of Project) do |acc, pattern|
++          Dir.glob(Path[root_path, pattern].to_s).each do |match|
++            if File.directory?(match) && File.exists?(Path[match, "shard.yml"])
++              acc << Project.new(URI.parse("file://#{match}"))
++            end
+           end
++          acc
+         end
+-      end || [] of Project
+-
+-      projects << root_project
+-    rescue e
+-      # Failing that, create a project for the workspace root.
+-      [root_project]
++        # Also include the root if it has a shard.yml.
++        if File.exists?(Path[root_path, "shard.yml"])
++          projects << Project.new(workspace_root_uri)
++        end
++      end
++    rescue
++      # Ignore errors and keep whatever we found.
+     end
++
++    projects.uniq!(&.root_uri.to_s)
++    projects.empty? ? [Project.new(workspace_root_uri)] : projects
+   end
+ 
+   # Finds the path-wise distance to the given file URI. If the file URI is not a
+diff --git a/src/crystalline/utils.cr b/src/crystalline/utils.cr
+index 2c3ff99..5c949b2 100644
+--- a/src/crystalline/utils.cr
++++ b/src/crystalline/utils.cr
+@@ -1,4 +1,22 @@
+ module Crystalline::Utils
++  # Run a block with a timeout.
++  def self.with_timeout(timeout : Time::Span, &block)
++    channel = Channel(typeof(yield)).new(1)
++    spawn do
++      channel.send(yield)
++    rescue e
++      # We don't want to crash the whole server if the block crashes.
++      LSP::Log.error { "Error in timed block: #{e.message}" }
++    end
++
++    select
++    when result = channel.receive
++      result
++    when timeout(timeout)
++      nil
++    end
++  end
++
+   def self.map_completion_kind(kind, *, default = LSP::CompletionItemKind::Variable)
+     case kind
+     when Crystal::FileModule
+diff --git a/src/crystalline/workspace.cr b/src/crystalline/workspace.cr
+index c02f195..e289375 100644
+--- a/src/crystalline/workspace.cr
++++ b/src/crystalline/workspace.cr
+@@ -173,6 +173,9 @@ class Crystalline::Workspace
+             contents = text_overrides.try(&.[uri_str]?) || text_document.contents
+             contents = fix_source(contents)
+ 
++            # Fix for #67: if this is the entry point, and it's a project that uses
++            # a non-standard structure (like Lucky), we check if there's a src/requires.cr
++            # or if the entry point itself should implicitly require everything.
+             if target_string == uri_str
+               # If the entry point itself needs to be loaded from memory.
+               sources = [
+@@ -182,6 +185,15 @@ class Crystalline::Workspace
+             file_path = URI.parse(uri_str).decoded_path
+             file_overrides[file_path] = contents
+           }
++
++          # If the project has a src/requires.cr file, ensure it is part of the overrides
++          # if not already open, or ensure it's required.
++          if project && (root_path = project.root_uri.decoded_path)
++            requires_path = Path[root_path, "src", "requires.cr"]
++            if File.exists?(requires_path) && !file_overrides.has_key?(requires_path.to_s)
++              file_overrides[requires_path.to_s] = fix_source(File.read(requires_path))
++            end
++          end
+         end
+ 
+         lib_path = project.try(&.default_lib_path)
