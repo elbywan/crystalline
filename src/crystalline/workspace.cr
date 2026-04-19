@@ -372,9 +372,12 @@ class Crystalline::Workspace
       byte_offset = 0
       char_offset = 0
       current_line.each_char do |char|
-        break if char_offset >= position.character
+        # In UTF-16, characters > 0xFFFF take 2 code units (surrogate pair).
+        u16_size = char.ord > 0xFFFF ? 2 : 1
+        break if char_offset + u16_size > position.character
+        
         byte_offset += char.bytesize
-        char_offset += 1
+        char_offset += u16_size
       end
       # Lexer column numbers are 1-based byte offsets.
       lexer_column = byte_offset + 1
