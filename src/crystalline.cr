@@ -2,7 +2,7 @@ require "./crystalline/requires"
 require "./crystalline/*"
 require "option_parser"
 
-log_level = :warn
+log_level = ::Log::Severity::Warn
 
 OptionParser.parse do |parser|
   parser.banner = "Usage: crystalline [options]"
@@ -19,10 +19,10 @@ OptionParser.parse do |parser|
 
   parser.on("-l LEVEL", "--log LEVEL", "Set log level (debug, info, warn, error). Default: warn") do |level|
     log_level = case level.downcase
-                when "debug" then :debug
-                when "info"  then :info
-                when "warn"  then :warn
-                when "error" then :error
+                when "debug" then ::Log::Severity::Debug
+                when "info"  then ::Log::Severity::Info
+                when "warn"  then ::Log::Severity::Warn
+                when "error" then ::Log::Severity::Error
                 else
                   STDERR.puts "Invalid log level: #{level}"
                   exit 1
