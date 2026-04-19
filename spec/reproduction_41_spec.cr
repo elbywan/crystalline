@@ -21,7 +21,7 @@ describe Crystalline::TextDocument do
     # Expected behavior without .chomp: "def foo\n# commentend\n"
     # (Actually, character 8 is the start of the newline, so adding "# comment" there
     # should result in "def foo# comment\nend\n")
-    
+
     # Let's try appending after the newline (char 9 on line 0 doesn't exist, but char 0 on line 1 does)
     # To truly test the .chomp issue:
     # If we edit line 0 at character 8 (the \n itself).
@@ -29,7 +29,7 @@ describe Crystalline::TextDocument do
     # If .chomp is used, prefix becomes "def foo"
     # Then we add "# comment"
     # Result: "def foo# commentend\n" (newline is LOST)
-    
+
     doc.contents.should contain("\n")
     doc.contents.should eq("def foo\n# commentend\n")
   end
