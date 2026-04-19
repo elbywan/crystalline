@@ -189,12 +189,12 @@ class Crystalline::Workspace
 
             if File.exists?(requires_path)
               # Priority: text_overrides -> opened_documents -> filesystem
-              requires_contents = text_overrides.try(&.[requires_uri]?) || 
-                                  @opened_documents[requires_uri]?.try(&.contents) || 
+              requires_contents = text_overrides.try(&.[requires_uri]?) ||
+                                  @opened_documents[requires_uri]?.try(&.contents) ||
                                   File.read(requires_path)
-              
+
               requires_contents = fix_source(requires_contents)
-              
+
               # IMPORTANT: Do not add it to sources if it is already the target!
               if sources && target_string != requires_uri
                 sources << Crystal::Compiler::Source.new(requires_path_s, requires_contents)
