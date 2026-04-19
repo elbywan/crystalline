@@ -172,26 +172,32 @@ class Crystalline::Workspace
           @opened_documents.each { |uri_str, text_document|
             contents = text_overrides.try(&.[uri_str]?) || text_document.contents
             contents = fix_source(contents)
+            file_overrides[URI.parse(uri_str).decoded_path] = contents
+          }
 
-            if target_string == uri_str
-              # If the entry point itself needs to be loaded from memory.
-              sources = [
-                Crystal::Compiler::Source.new(target.decoded_path, contents),
-              ]
+          if (doc = @opened_documents[target_string]?)
+            contents = text_overrides.try(&.[target_string]?) || doc.contents
+            sources = [Crystal::Compiler::Source.new(target.decoded_path, fix_source(contents))]
+          end
 
-              # Fix for #67: if the project has a src/requires.cr file, add it as an additional source
-              # to force discovery of classes, without shifting line numbers of the entry point.
-              if project && (root_path = project.root_uri.decoded_path)
-                requires_path = Path[root_path, "src", "requires.cr"]
-                if File.exists?(requires_path)
-                  sources << Crystal::Compiler::Source.new(requires_path.to_s, fix_source(File.read(requires_path)))
-                  # Also ensure requires.cr is in file_overrides.
-                  if !file_overrides.has_key?(requires_path.to_s)
-                    file_overrides[requires_path.to_s] = fix_source(File.read(requires_path))
-                  end
-                end
-              end
+          # Fix for #67: if the project has a src/requires.cr file, add it as an additional source
+          # to force discovery of classes, without shifting line numbers of the entry point.
+          if project && (root_path = project.root_uri.decoded_path)
+            requires_path = Path[root_path, "src", "requires.cr"]
+            requires_path_s = requires_path.to_s
+            if File.exists?(requires_path)
+              # Priority: text_overrides -> opened_documents -> filesystem
+              requires_uri = "file://#{requires_path}"
+              requires_contents = text_overrides.try(&.[requires_uri]?) || 
+                                  @opened_documents[requires_uri]?.try(&.contents) || 
+                                  File.read(requires_path)
+              
+              requires_contents = fix_source(requires_contents)
+              
+              sources << Crystal::Compiler::Source.new(requires_path_s, requires_contents) if sources
+              file_overrides[requires_path_s] = requires_contents
             end
+          end
         end
 
         lib_path = project.try(&.default_lib_path)
