@@ -44,11 +44,11 @@ module Crystalline
     end
   end
 
-  def self.init(*, input : IO = STDIN, output : IO = STDOUT)
+  def self.init(*, input : IO = STDIN, output : IO = STDOUT, log_level : ::Log::Severity = :warn)
     EnvironmentConfig.run
-    {% if flag?(:debug) %}
-      ::Log.setup(:debug, LSP::Log.backend.not_nil!)
-    {% end %}
+
+    ::Log.setup(log_level, LSP::Log.backend.not_nil!)
+
     server = LSP::Server.new(input, output, SERVER_CAPABILITIES)
     Controller.new(server)
   rescue ex
