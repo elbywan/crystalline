@@ -1,0 +1,68 @@
+diff --git a/src/crystalline.cr b/src/crystalline.cr
+index ae14682..6208d0e 100644
+--- a/src/crystalline.cr
++++ b/src/crystalline.cr
+@@ -1,9 +1,39 @@
+ require "./crystalline/requires"
+ require "./crystalline/*"
++require "option_parser"
+ 
+-if ARGV.includes?("--version")
+-  puts(Crystalline::VERSION)
+-  exit
++log_level = :warn
++
++OptionParser.parse do |parser|
++  parser.banner = "Usage: crystalline [options]"
++
++  parser.on("-v", "--version", "Show version") do
++    puts Crystalline::VERSION
++    exit
++  end
++
++  parser.on("-h", "--help", "Show help") do
++    puts parser
++    exit
++  end
++
++  parser.on("-l LEVEL", "--log LEVEL", "Set log level (debug, info, warn, error). Default: warn") do |level|
++    log_level = case level.downcase
++                when "debug" then :debug
++                when "info"  then :info
++                when "warn"  then :warn
++                when "error" then :error
++                else
++                  STDERR.puts "Invalid log level: #{level}"
++                  exit 1
++                end
++  end
++
++  parser.invalid_option do |flag|
++    STDERR.puts "ERROR: #{flag} is not a valid option."
++    STDERR.puts parser
++    exit 1
++  end
+ end
+ 
+-Crystalline.init
++Crystalline.init(log_level: log_level)
+diff --git a/src/crystalline/main.cr b/src/crystalline/main.cr
+index 8e44cb7..59fd44e 100644
+--- a/src/crystalline/main.cr
++++ b/src/crystalline/main.cr
+@@ -44,12 +44,11 @@ module Crystalline
+     end
+   end
+ 
+-  def self.init(*, input : IO = STDIN, output : IO = STDOUT)
++  def self.init(*, input : IO = STDIN, output : IO = STDOUT, log_level : ::Log::Severity = :warn)
+     EnvironmentConfig.run
+-    {% if flag?(:debug) %}
+-      ::Log.setup(:debug, LSP::Log.backend.not_nil!)
+-    {% end %}
++
+     server = LSP::Server.new(input, output, SERVER_CAPABILITIES)
++    ::Log.setup(log_level, LSP::Log.backend.not_nil!)
+     Controller.new(server)
+   rescue ex
+     LSP::Log.error(exception: ex) { %(#{ex.message || "Unknown error during init."}\n#{ex.backtrace.join('\n')}) }

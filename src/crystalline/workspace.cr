@@ -68,22 +68,52 @@ class Crystalline::Workspace
 
   def format_document(params : LSP::DocumentFormattingParams) : {String, TextDocument}?
     @opened_documents[params.text_document.uri]?.try { |document|
-      {Crystal.format(document.contents), document}
+      contents = document.contents
+      return if contents.blank?
+      formatted = Crystal.format(contents)
+      # Basic safety check: if formatting returned an empty string but the original wasn't empty,
+      # something went wrong. Also check for basic syntax validity of the result.
+      begin
+        Crystal::Parser.parse(formatted)
+      rescue e
+        LSP::Log.warn { "Formatting skipped for #{params.text_document.uri}: the result contains syntax errors. #{e.message}" }
+        return nil
+      end
+      {formatted, document}
     }
   rescue e
-    # swallow exceptions silently
+    LSP::Log.warn { "Formatting failed for #{params.text_document.uri}: #{e.message}" }
+    nil
   end
 
   def format_document(params : LSP::DocumentRangeFormattingParams) : {String, TextDocument}?
     @opened_documents[params.text_document.uri]?.try { |document|
       range = params.range
-      contents_lines = document.contents.lines(chomp: false)[range.start.line..range.end.line]
-      contents_lines[-1] = contents_lines.last[...range.end.character] if range.end.character > 0
-      contents_lines[0] = contents_lines.first[range.start.character...]
-      {Crystal.format(contents_lines.join), document}
+      contents_lines = document.contents.lines(chomp: false)[range.start.line..range.end.line]?
+      return if contents_lines.nil? || contents_lines.empty?
+
+      last_line = contents_lines.last
+      end_char = Math.min(range.end.character, last_line.size)
+      contents_lines[-1] = last_line[...end_char]
+
+      first_line = contents_lines.first
+      start_char = Math.min(range.start.character, first_line.size)
+      contents_lines[0] = first_line[start_char...]
+
+      target = contents_lines.join
+      return if target.blank?
+
+      formatted = Crystal.format(target)
+      # For range formatting, we might not be able to parse the fragment alone,
+      # but we can check if it's empty.
+      # Also chomp the result because Crystal.format always adds a trailing newline.
+      return if formatted.blank?
+
+      {formatted.chomp, document}
     }
   rescue e
-    # swallow exceptions silently
+    LSP::Log.warn { "Range formatting failed for #{params.text_document.uri}: #{e.message}" }
+    nil
   end
 
   # Run a top level semantic analysis to compute dependencies.
@@ -169,7 +199,7 @@ class Crystalline::Workspace
         if in_memory
           # Tell the compiler to load the opened files from memory, not from the filesystem.
           file_overrides = Hash(String, String).new
-          @opened_documents.each { |uri_str, text_document|
+          @opened_documents.each { |uri_str, text_document| 
             contents = text_overrides.try(&.[uri_str]?) || text_document.contents
             contents = fix_source(contents)
             file_overrides[URI.parse(uri_str).decoded_path] = contents
@@ -384,6 +414,48 @@ class Crystalline::Workspace
   def completion(server : LSP::Server, file_uri : URI, position : LSP::Position, trigger_character : String?)
     text_document = @opened_documents[file_uri.to_s]?
     return unless text_document
+
+    # Check if we are inside a comment.
+    current_line = text_document.contents.lines(chomp: false)[position.line]?
+    if current_line
+      # Convert UTF-16 character position to byte offset for the lexer.
+      byte_offset = 0
+      char_offset = 0
+      current_line.each_char do |char|
+        # In UTF-16, characters > 0xFFFF take 2 code units (surrogate pair).
+        u16_size = char.ord > 0xFFFF ? 2 : 1
+        break if char_offset + u16_size > position.character
+
+        byte_offset += char.bytesize
+        char_offset += u16_size
+      end
+      # Lexer column numbers are 1-based byte offsets.
+      lexer_column = byte_offset + 1
+
+      lexer = Crystal::Lexer.new(current_line)
+      begin
+        loop do
+          token = lexer.next_token
+          break if token.type == :EOF
+
+          if (loc = token.location)
+            break if loc.column_number > lexer_column
+          end
+
+          if token.type == :COMMENT
+            if (loc = token.location)
+              token_start = loc.column_number
+              # If the cursor is at or after the start of the comment.
+              if lexer_column >= token_start
+                return nil
+              end
+            end
+          end
+        end
+      rescue Crystal::SyntaxException
+        # Ignore syntax errors while typing
+      end
+    end
 
     # LSP::Log.info { "completion: #{trigger_character}"}
 
