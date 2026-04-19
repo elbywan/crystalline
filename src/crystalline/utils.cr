@@ -1,7 +1,7 @@
 module Crystalline::Utils
   # Run a block with a timeout.
   def self.with_timeout(timeout : Time::Span, &block)
-    channel = Channel(typeof(yield)).new
+    channel = Channel(typeof(yield)).new(1)
     spawn do
       channel.send(yield)
     rescue e
