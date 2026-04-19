@@ -55,7 +55,7 @@ describe Crystalline::Workspace do
       content_changes: [
         LSP::DidChangeTextDocumentParams::TextDocumentContentChangeEvent.new(
           text: content_with_string
-        )
+        ),
       ]
     ))
     # Dot at end of string. Line 0, character 31.
@@ -65,7 +65,7 @@ describe Crystalline::Workspace do
     # result_in_string could be nil if compilation failed, but we just want to ensure it didn't return EARLY.
     # However, since we don't have real environment here, completion might return nil.
     # We can check that it didn't return nil within the first few lines of the method.
-    # Actually, result_in_string being nil is ambiguous. 
+    # Actually, result_in_string being nil is ambiguous.
     # Let's just trust our Lexer logic which is standard Crystal.
   end
 end

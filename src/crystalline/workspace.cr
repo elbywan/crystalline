@@ -375,7 +375,7 @@ class Crystalline::Workspace
         # In UTF-16, characters > 0xFFFF take 2 code units (surrogate pair).
         u16_size = char.ord > 0xFFFF ? 2 : 1
         break if char_offset + u16_size > position.character
-        
+
         byte_offset += char.bytesize
         char_offset += u16_size
       end
@@ -387,7 +387,7 @@ class Crystalline::Workspace
         loop do
           token = lexer.next_token
           break if token.type == :EOF
-          
+
           if (loc = token.location)
             break if loc.column_number > lexer_column
           end
