@@ -68,22 +68,46 @@ class Crystalline::Workspace
 
   def format_document(params : LSP::DocumentFormattingParams) : {String, TextDocument}?
     @opened_documents[params.text_document.uri]?.try { |document|
-      {Crystal.format(document.contents), document}
+      contents = document.contents
+      return if contents.blank?
+      formatted = Crystal.format(contents)
+      # Basic safety check: if formatting returned an empty string but the original wasn't empty,
+      # something went wrong. Also check for basic syntax validity of the result.
+      begin
+        Crystal::Parser.parse(formatted)
+      rescue e
+        LSP::Log.warn { "Formatting skipped for #{params.text_document.uri}: the result contains syntax errors. #{e.message}" }
+        return nil
+      end
+      {formatted, document}
     }
   rescue e
-    # swallow exceptions silently
+    LSP::Log.warn { "Formatting failed for #{params.text_document.uri}: #{e.message}" }
+    nil
   end
 
   def format_document(params : LSP::DocumentRangeFormattingParams) : {String, TextDocument}?
     @opened_documents[params.text_document.uri]?.try { |document|
       range = params.range
       contents_lines = document.contents.lines(chomp: false)[range.start.line..range.end.line]
+      return if contents_lines.empty?
+
       contents_lines[-1] = contents_lines.last[...range.end.character] if range.end.character > 0
       contents_lines[0] = contents_lines.first[range.start.character...]
-      {Crystal.format(contents_lines.join), document}
+
+      target = contents_lines.join
+      return if target.blank?
+
+      formatted = Crystal.format(target)
+      # For range formatting, we might not be able to parse the fragment alone,
+      # but we can check if it's empty.
+      return if formatted.blank?
+
+      {formatted, document}
     }
   rescue e
-    # swallow exceptions silently
+    LSP::Log.warn { "Range formatting failed for #{params.text_document.uri}: #{e.message}" }
+    nil
   end
 
   # Run a top level semantic analysis to compute dependencies.

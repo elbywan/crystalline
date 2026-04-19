@@ -63,7 +63,7 @@ class Crystalline::TextDocument
   end
 
   private def partial_update(contents : String, range : LSP::Range, version : Number? = nil)
-    prefix = @inner_contents[range.start.line]?.try &.[...range.start.character].chomp || ""
+    prefix = @inner_contents[range.start.line]?.try &.[...range.start.character] || ""
     suffix = @inner_contents[range.end.line]?.try &.[range.end.character..]? || @inner_contents[range.end.line]? || ""
     replacement_lines = String.build { |str|
       str << prefix << contents << suffix
