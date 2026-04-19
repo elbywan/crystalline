@@ -45,10 +45,11 @@ module Crystalline
   end
 
   def self.init(*, input : IO = STDIN, output : IO = STDOUT, log_level : ::Log::Severity = :warn)
-    EnvironmentConfig.run
-
     # Setup a temporary backend to STDERR so we can log early initialization errors.
+    # This MUST be done first to avoid STDOUT corruption.
     ::Log.setup(log_level, ::Log::IOBackend.new(STDERR))
+
+    EnvironmentConfig.run
 
     server = LSP::Server.new(input, output, SERVER_CAPABILITIES)
 
