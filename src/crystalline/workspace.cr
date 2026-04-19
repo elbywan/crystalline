@@ -365,6 +365,27 @@ class Crystalline::Workspace
     text_document = @opened_documents[file_uri.to_s]?
     return unless text_document
 
+    # Check if we are inside a comment.
+    current_line = text_document.contents.lines(chomp: false)[position.line]?
+    if current_line
+      lexer = Crystal::Lexer.new(current_line)
+      loop do
+        token = lexer.next_token
+        break if token.type == :EOF
+        # If the token starts after our trigger character, we stop.
+        break if token.location.not_nil!.column_number > position.character
+        
+        if token.type == :COMMENT
+          # If the cursor is within the range of this comment token.
+          token_start = token.location.not_nil!.column_number
+          # Lexer column numbers are 1-based. Position character is 0-based.
+          if position.character >= token_start - 1
+            return nil
+          end
+        end
+      end
+    end
+
     # LSP::Log.info { "completion: #{trigger_character}"}
 
     document_lines = fix_source(text_document.contents).lines(chomp: false)
