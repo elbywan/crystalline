@@ -8,14 +8,26 @@ class Crystalline::Progress
   end
 
   def report(server, *, async = false, &cb : Proc(String?))
-    create_request = LSP::WorkDoneProgressCreateRequest.new(
-      id: 0,
-      params: LSP::WorkDoneProgressCreateParams.new(
-        token: @token,
-      ),
-    )
+    if server.client_capabilities.window.try &.work_done_progress
+      create_request = LSP::WorkDoneProgressCreateRequest.new(
+        id: 0,
+        params: LSP::WorkDoneProgressCreateParams.new(
+          token: @token,
+        ),
+      )
 
-    create_request.on_response {
+      create_request.on_response {
+        if async
+          spawn {
+            report_callback(server, &cb)
+          }
+        else
+          report_callback(server, &cb)
+        end
+      }
+
+      server.send(create_request)
+    else
       if async
         spawn {
           report_callback(server, &cb)
@@ -23,9 +35,7 @@ class Crystalline::Progress
       else
         report_callback(server, &cb)
       end
-    }
-
-    server.send(create_request)
+    end
   end
 
   def send_progress_start(server)

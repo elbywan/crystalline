@@ -10,11 +10,17 @@ module Crystalline::Analysis
     end
   {% end %}
 
-  private def self.spawn_dedicated(*, name : String? = nil, &block)
-    fiber = Fiber.new(name, &block)
-    {% if flag?(:preview_mt) %} fiber.set_current_thread(@@dedicated_thread) {% end %}
-    fiber.enqueue
-    fiber
+  private def self.spawn_dedicated(*, name : String? = nil, &block : -> _)
+    captured_block = block
+    {% if flag?(:preview_mt) %}
+      fiber = Fiber.new(name, &captured_block)
+      fiber.set_current_thread(@@dedicated_thread)
+      fiber.enqueue
+      fiber
+    {% else %}
+      captured_block.call
+      Fiber.current
+    {% end %}
   end
 
   # Compile a target *file_uri*.

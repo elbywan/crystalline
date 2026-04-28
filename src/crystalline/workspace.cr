@@ -159,7 +159,7 @@ class Crystalline::Workspace
         return cached_result unless cached_result.nil? && discard_nil_cached_result
       end
 
-      sync_channel = Channel(Crystal::Compiler::Result?).new
+      sync_channel = Channel(Crystal::Compiler::Result?).new(1)
 
       progress.report(server) do
         file_overrides = nil
@@ -172,16 +172,13 @@ class Crystalline::Workspace
           @opened_documents.each { |uri_str, text_document|
             contents = text_overrides.try(&.[uri_str]?) || text_document.contents
             contents = fix_source(contents)
-
-            if target_string == uri_str
-              # If the entry point itself needs to be loaded from memory.
-              sources = [
-                Crystal::Compiler::Source.new(target.decoded_path, contents),
-              ]
-            end
-            file_path = URI.parse(uri_str).decoded_path
-            file_overrides[file_path] = contents
+            file_overrides[URI.parse(uri_str).decoded_path] = contents
           }
+
+          if (doc = @opened_documents[target_string]?)
+            contents = text_overrides.try(&.[target_string]?) || doc.contents
+            sources = [Crystal::Compiler::Source.new(target.decoded_path, fix_source(contents))]
+          end
         end
 
         lib_path = project.try(&.default_lib_path)
@@ -361,9 +358,10 @@ class Crystalline::Workspace
     nil
   end
 
-  def completion(server : LSP::Server, file_uri : URI, position : LSP::Position, trigger_character : String?)
+  def completion(server : LSP::Server, file_uri : URI, position : LSP::Position, trigger_character : String?) : LSP::CompletionList?
     text_document = @opened_documents[file_uri.to_s]?
     return unless text_document
+
 
     document_lines = fix_source(text_document.contents).lines(chomp: false)
     completion_context = CompletionContext.detect(document_lines[position.line], position.character, trigger_character)
@@ -386,7 +384,6 @@ class Crystalline::Workspace
     result = self.compile(
       server,
       file_uri,
-      in_memory: true,
       discard_nil_cached_result: true,
       wants_doc: true,
       text_overrides: text_overrides,
