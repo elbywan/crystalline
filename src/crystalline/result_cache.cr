@@ -1,6 +1,9 @@
 class Crystalline::ResultCache
+  # A monotonic timestamp used to store the invalidation date.
+  @@reference_clock = Time.instant
+
   # A cache of compiler results with invalidation time, indexed by file name.
-  @cache : Hash(String, {Crystal::Compiler::Result?, Time::Instant?}) = Hash(String, {Crystal::Compiler::Result?, Time::Instant?}).new
+  @cache : Hash(String, {Crystal::Compiler::Result?, Time::Span?}) = Hash(String, {Crystal::Compiler::Result?, Time::Span?}).new
 
   # Remove the result, store the timestamp.
   def invalidate(entry : String)
@@ -14,7 +17,7 @@ class Crystalline::ResultCache
 
   # True if the cache has been invalidated *since* the *since* time argument,
   # or if the entry is invalided if *since* is not provided.
-  def invalidated?(entry : String, *, since : Time::Instant? = nil) : Bool
+  def invalidated?(entry : String, *, since : Time::Span? = nil) : Bool
     return false unless exists?(entry)
     invalidation_time = @cache[entry][1]
     if since
@@ -33,13 +36,13 @@ class Crystalline::ResultCache
   #
   # If *unless_invalidated_since* is provided, is will not store the result if the previous result has been
   # invalidated since the privided timestamp.
-  def set(entry : String, result : Crystal::Compiler::Result?, *, unless_invalidated_since : Time::Instant? = nil)
+  def set(entry : String, result : Crystal::Compiler::Result?, *, unless_invalidated_since : Time::Span? = nil)
     invalidated = unless_invalidated_since && invalidated?(entry, since: unless_invalidated_since)
     @cache[entry] = {result, nil} unless invalidated
   end
 
   # Return the current monotonic time.
   def monotonic_now
-    Time.instant
+    Time.instant - @@reference_clock
   end
 end
