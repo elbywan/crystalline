@@ -209,6 +209,29 @@ class Crystalline::Workspace
             contents = text_overrides.try(&.[target_string]?) || doc.contents
             sources = [Crystal::Compiler::Source.new(target.decoded_path, fix_source(contents))]
           end
+
+          # Fix for #67: if the project has a src/requires.cr file, add it as an additional source
+          # to force discovery of classes, without shifting line numbers of the entry point.
+          if project && (root_path = project.root_uri.decoded_path)
+            requires_path = Path[root_path, "src", "requires.cr"]
+            requires_path_s = requires_path.to_s
+            requires_uri = "file://#{requires_path}"
+
+            if File.exists?(requires_path)
+              # Priority: text_overrides -> opened_documents -> filesystem
+              requires_contents = text_overrides.try(&.[requires_uri]?) ||
+                                  @opened_documents[requires_uri]?.try(&.contents) ||
+                                  File.read(requires_path)
+
+              requires_contents = fix_source(requires_contents)
+
+              # IMPORTANT: Do not add it to sources if it is already the target!
+              if sources && target_string != requires_uri
+                sources << Crystal::Compiler::Source.new(requires_path_s, requires_contents)
+              end
+              file_overrides[requires_path_s] = requires_contents
+            end
+          end
         end
 
         lib_path = project.try(&.default_lib_path)
