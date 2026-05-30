@@ -262,7 +262,8 @@ class Crystalline::Workspace
       end
     end
 
-    result = self.compile(server, file_uri, in_memory: true, wants_doc: true)
+    result = @semantic_cache[semantic_cache_key(file_uri)]?
+    return unless result
     location = Crystal::Location.new(
       file_uri.decoded_path,
       line_number: position.line + 1,
@@ -407,28 +408,6 @@ class Crystalline::Workspace
     )
 
     result = @semantic_cache[semantic_cache_key(file_uri)]?
-
-    unless result
-      document_lines[position.line] = completion_context.rewritten_line
-      # Force the compiler load the file from this Hash.
-      text_overrides = {
-        file_uri.to_s => document_lines.join,
-      }
-
-      # Trigger a compilation that will not fail fast.
-      result = self.compile(
-        server,
-        file_uri,
-        in_memory: true,
-        discard_nil_cached_result: true,
-        wants_doc: true,
-        text_overrides: text_overrides,
-        # Prevent showing diagnostics and caching results since the diagnostics can be inaccurate
-        ignore_diagnostics: true,
-        do_not_cache_result: true
-      )
-    end
-
     return unless result
 
     nodes, _ = Analysis.nodes_at_cursor(result, location)
