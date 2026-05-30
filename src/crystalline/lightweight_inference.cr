@@ -80,13 +80,11 @@ module Crystalline::Lightweight
       when Crystal::If
         return unless !apply_cursor_bounds || starts_before_or_at_cursor?(node)
 
-        process_node(node.then, apply_cursor_bounds: apply_cursor_bounds)
-        process_node(node.else, apply_cursor_bounds: apply_cursor_bounds)
+        process_conditional(node.then, node.else, apply_cursor_bounds: apply_cursor_bounds)
       when Crystal::Unless
         return unless !apply_cursor_bounds || starts_before_or_at_cursor?(node)
 
-        process_node(node.then, apply_cursor_bounds: apply_cursor_bounds)
-        process_node(node.else, apply_cursor_bounds: apply_cursor_bounds)
+        process_conditional(node.then, node.else, apply_cursor_bounds: apply_cursor_bounds)
       else
         return unless !apply_cursor_bounds || before_cursor?(node)
       end
@@ -213,6 +211,43 @@ module Crystalline::Lightweight
 
       walker.call(node, nil, nil)
       found
+    end
+
+    private def process_conditional(then_branch : Crystal::ASTNode, else_branch : Crystal::ASTNode, *, apply_cursor_bounds : Bool)
+      base_local_types = @local_types.dup
+      base_instance_var_types = @instance_var_types.dup
+      base_class_var_types = @class_var_types.dup
+
+      process_node(then_branch, apply_cursor_bounds: apply_cursor_bounds)
+      then_local_types = @local_types.dup
+      then_instance_var_types = @instance_var_types.dup
+      then_class_var_types = @class_var_types.dup
+
+      @local_types = base_local_types.dup
+      @instance_var_types = base_instance_var_types.dup
+      @class_var_types = base_class_var_types.dup
+
+      process_node(else_branch, apply_cursor_bounds: apply_cursor_bounds)
+      else_local_types = @local_types.dup
+      else_instance_var_types = @instance_var_types.dup
+      else_class_var_types = @class_var_types.dup
+
+      @local_types = merge_branch_types(base_local_types, then_local_types, else_local_types)
+      @instance_var_types = merge_branch_types(base_instance_var_types, then_instance_var_types, else_instance_var_types)
+      @class_var_types = merge_branch_types(base_class_var_types, then_class_var_types, else_class_var_types)
+    end
+
+    private def merge_branch_types(base : Hash(String, Array(String)), left : Hash(String, Array(String)), right : Hash(String, Array(String)))
+      merged = {} of String => Array(String)
+
+      (base.keys | left.keys | right.keys).each do |name|
+        candidates = [] of String
+        candidates.concat(left[name]? || base[name]? || [] of String)
+        candidates.concat(right[name]? || base[name]? || [] of String)
+        merged[name] = candidates.uniq unless candidates.empty?
+      end
+
+      merged
     end
 
     private def seed_arg_types(definition : Crystal::Def)

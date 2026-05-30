@@ -110,4 +110,39 @@ describe Crystalline::Lightweight::Inference do
     inference.types_for("current").should eq(["Wrapper"])
     inference.types_for_instance_var("@greeter").should eq(["Greeter"])
   end
+
+  it "merges conditional branch assignments into union-like local types" do
+    index = build_lightweight_index <<-CRYSTAL
+      class Foo
+      end
+    CRYSTAL
+
+    source = <<-CRYSTAL
+      def demo(flag : Bool)
+        value = 1
+
+        if flag
+          item = Foo.new
+          value = "hello"
+        else
+          item = 1
+        end
+
+        item
+        value
+      end
+    CRYSTAL
+
+    inference = Crystalline::Lightweight::Inference.for(
+      source,
+      11,
+      8,
+      Crystalline::Lightweight::Query.new(index),
+    )
+
+    inference.should_not be_nil
+    inference = inference.not_nil!
+    inference.types_for("item").sort.should eq(["Foo", "Int32"])
+    inference.types_for("value").sort.should eq(["Int32", "String"])
+  end
 end
