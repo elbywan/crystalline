@@ -1,7 +1,12 @@
 require "compiler/crystal/syntax"
 
 class Crystalline::CompletionContext
-  record TokenSpan, type : Crystal::Token::Kind, start_char : Int32, end_char : Int32
+  record TokenSpan,
+    type : Crystal::Token::Kind,
+    start_char : Int32,
+    end_char : Int32,
+    delimiter_kind : Crystal::Token::DelimiterKind? = nil,
+    delimiter_end : String? = nil
 
   getter trigger_character : String?
   getter analysis_column : Int32
@@ -24,7 +29,7 @@ class Crystalline::CompletionContext
     @replace_end = fragment_end
 
     tokens = tokens_for_line
-    return if inside_comment?(tokens) || inside_quoted_literal?
+    return if inside_comment?(tokens) || inside_delimited_literal?(tokens)
 
     if @trigger_character.nil?
       @trigger_character = inferred_trigger(tokens, fragment_start)
@@ -117,6 +122,8 @@ class Crystalline::CompletionContext
         type: token.type,
         start_char: token.column_number - 1,
         end_char: token.column_number - 1 + length,
+        delimiter_kind: token.type.delimiter_start? ? token.delimiter_state.kind : nil,
+        delimiter_end: token.type.delimiter_start? ? token.delimiter_state.end.to_s : nil,
       ) if length > 0
     end
 
@@ -127,6 +134,8 @@ class Crystalline::CompletionContext
     case token.type
     when .ident?, .const?, .instance_var?, .class_var?, .comment?, .global?, .symbol?, .number?
       token.value.to_s.size
+    when .delimiter_start?
+      token.delimiter_state.kind.in?(Crystal::Token::DelimiterKind::STRING, Crystal::Token::DelimiterKind::REGEX) ? 1 : 2
     when .op_colon_colon?
       2
     when .op_period?
@@ -140,48 +149,34 @@ class Crystalline::CompletionContext
     tokens.any? { |token| token.type.comment? && @cursor >= token.start_char }
   end
 
-  private def inside_quoted_literal?
-    in_single = false
-    in_double = false
-    escaped = false
+  private def inside_delimited_literal?(tokens : Array(TokenSpan))
+    open_delimiter = nil.as(TokenSpan?)
 
-    @line.each_char_with_index do |char, index|
-      break if index >= @cursor
-
-      if escaped
-        escaped = false
-        next
-      end
-
-      if in_single
-        case char
-        when '\\'
-          escaped = true
-        when '\''
-          in_single = false
+    tokens.each do |token|
+      if current = open_delimiter
+        if delimiter_end?(token, current)
+          return true if @cursor > current.start_char && @cursor <= token.start_char
+          open_delimiter = nil
+        else
+          return true if @cursor >= token.start_char && @cursor < token.end_char
         end
-        next
-      end
-
-      if in_double
-        case char
-        when '\\'
-          escaped = true
-        when '"'
-          in_double = false
-        end
-        next
-      end
-
-      case char
-      when '\''
-        in_single = true
-      when '"'
-        in_double = true
+      elsif token.type.delimiter_start?
+        open_delimiter = token
       end
     end
 
-    in_single || in_double
+    open_delimiter ? @cursor > open_delimiter.not_nil!.start_char : false
+  end
+
+  private def delimiter_end?(token : TokenSpan, current : TokenSpan)
+    delimiter_end = current.delimiter_end
+    return false unless delimiter_end
+
+    if token.type.delimiter_start?
+      token.delimiter_end == delimiter_end
+    else
+      token_text(token) == delimiter_end
+    end
   end
 
   private def inferred_trigger(tokens : Array(TokenSpan), fragment_start : Int32)
@@ -216,6 +211,17 @@ class Crystalline::CompletionContext
   private def preceding_colon_colon(tokens : Array(TokenSpan), fragment_start : Int32)
     tokens.reverse_each.find do |token|
       token.type.op_colon_colon? && token.end_char == fragment_start
+    end
+  end
+
+  private def token_text(token : TokenSpan)
+    case token.type
+    when .op_colon_colon?
+      "::"
+    when .op_period?
+      "."
+    else
+      @line[token.start_char, token.end_char - token.start_char]? || ""
     end
   end
 
