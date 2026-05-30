@@ -9,7 +9,11 @@ jobs:
   macos:
     strategy:
       matrix:
-        runner: [macos-latest, macos-13]
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout repository
@@ -28,7 +32,7 @@ jobs:
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v7.0.1
         with:
-          name: crystalline_${{ matrix.runner == 'macos-latest' && 'arm64' || 'x86_64' }}-apple-darwin
+          name: crystalline_${{ matrix.arch }}-apple-darwin
           path: ./bin/crystalline
   linux:
     runs-on: ubuntu-latest
