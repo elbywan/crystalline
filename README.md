@@ -60,7 +60,7 @@ Building from source does take a long time._
 
 | Crystal   | Crystalline |
 | --------- | ----------- |
-| **1.20**  | **master**  |
+| **1.20**  | **0.18**    |
 | 1.16      | 0.17        |
 | 1.15      | 0.16        |
 | 1.14      | 0.15        |
