@@ -38,6 +38,14 @@ module Crystalline::Lightweight
       char.ascii_alphanumeric? || char.in?('_', '?', '!', '@', ':')
     end
 
+    def instance_var_name?(name : String)
+      !!(name =~ /\A@[a-zA-Z_][a-zA-Z0-9_?!]*\z/)
+    end
+
+    def class_var_name?(name : String)
+      !!(name =~ /\A@@[a-zA-Z_][a-zA-Z0-9_?!]*\z/)
+    end
+
     def local_name?(name : String)
       !!(name =~ /\A[a-z_][a-zA-Z0-9_?!]*\z/)
     end
@@ -52,14 +60,32 @@ module Crystalline::Lightweight
         return {[] of String, true}
       end
 
-      return {[] of String, false} unless local_name?(receiver)
-
       inference = Inference.for(
         source,
         line_number + 1,
         analysis_column + 1,
         query,
       )
+
+      if receiver == "self"
+        return inference.try(&.self_types) || {[] of String, false}
+      end
+
+      if instance_var_name?(receiver)
+        return {
+          (inference ? inference.types_for_instance_var(receiver) : [] of String).select { |type_name| query.find_type(type_name) != nil },
+          false,
+        }
+      end
+
+      if class_var_name?(receiver)
+        return {
+          (inference ? inference.types_for_class_var(receiver) : [] of String).select { |type_name| query.find_type(type_name) != nil },
+          true,
+        }
+      end
+
+      return {[] of String, false} unless local_name?(receiver)
 
       if inference
         local_types = inference.types_for(receiver).select { |type_name| query.find_type(type_name) != nil }
@@ -76,8 +102,11 @@ module Crystalline::Lightweight
     end
 
     private def chained_call_types(type_names : Array(String), class_method : Bool, method_name : String, query : Query) : {Array(String), Bool}
-      if class_method && method_name == "new"
-        return {type_names.select { |type_name| query.find_type(type_name) != nil }.uniq, false}
+      if class_method
+        return {type_names.select { |type_name| query.find_type(type_name) != nil }.uniq, false} if method_name == "new"
+        return {type_names.select { |type_name| query.find_type(type_name) != nil }.uniq, true} if method_name == "class"
+      elsif method_name == "class"
+        return {type_names.select { |type_name| query.find_type(type_name) != nil }.uniq, true}
       end
 
       return_types = type_names.flat_map do |type_name|

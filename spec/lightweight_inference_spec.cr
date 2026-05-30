@@ -63,4 +63,51 @@ describe Crystalline::Lightweight::Inference do
     inference.types_for("thing").should eq(["Foo"])
     inference.types_for("total").should eq(["Int32"])
   end
+
+  it "infers self and instance variables from the enclosing type" do
+    index = build_lightweight_index <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+      end
+
+      class Wrapper
+        def hello : String
+          "hi"
+        end
+      end
+    CRYSTAL
+
+    source = <<-CRYSTAL
+      class Wrapper
+        def initialize
+          @greeter = Greeter.new
+        end
+
+        def demo
+          current = self
+          @greeter.shout
+          current.hello
+        end
+
+        def hello : String
+          "hi"
+        end
+      end
+    CRYSTAL
+
+    inference = Crystalline::Lightweight::Inference.for(
+      source,
+      8,
+      12,
+      Crystalline::Lightweight::Query.new(index),
+    )
+
+    inference.should_not be_nil
+    inference = inference.not_nil!
+    inference.self_types.should eq({["Wrapper"], false})
+    inference.types_for("current").should eq(["Wrapper"])
+    inference.types_for_instance_var("@greeter").should eq(["Greeter"])
+  end
 end

@@ -27,8 +27,20 @@ module Crystalline::Lightweight
         return hover_for_method(receiver, token, start_index - 1) unless receiver.empty?
       end
 
+      if token == "self"
+        return hover_for_self
+      end
+
       if Resolver.type_name?(token)
         return hover_for_type(token)
+      end
+
+      if Resolver.instance_var_name?(token)
+        return hover_for_instance_var(token)
+      end
+
+      if Resolver.class_var_name?(token)
+        return hover_for_class_var(token)
       end
 
       if Resolver.local_name?(token)
@@ -58,11 +70,45 @@ module Crystalline::Lightweight
       build_hover([type.name], type.doc)
     end
 
+    private def hover_for_self : LSP::Hover?
+      inference = Inference.for(@source, @line_number + 1, @column_number + 1, @query)
+      return unless inference
+
+      type_names, class_method = inference.self_types
+      return if type_names.empty?
+
+      label = class_method ? "self : #{type_names.uniq.join(" | ")}.class" : "self : #{type_names.uniq.join(" | ")}"
+      doc = type_names.size == 1 ? @query.find_type(type_names.first).try(&.doc) : nil
+      build_hover([label], doc)
+    end
+
     private def hover_for_local(name : String) : LSP::Hover?
       inference = Inference.for(@source, @line_number + 1, @column_number + 1, @query)
       return unless inference
 
       type_names = inference.types_for(name)
+      return if type_names.empty?
+
+      doc = type_names.size == 1 ? @query.find_type(type_names.first).try(&.doc) : nil
+      build_hover(["#{name} : #{type_names.uniq.join(" | ")}"], doc)
+    end
+
+    private def hover_for_instance_var(name : String) : LSP::Hover?
+      inference = Inference.for(@source, @line_number + 1, @column_number + 1, @query)
+      return unless inference
+
+      type_names = inference.types_for_instance_var(name)
+      return if type_names.empty?
+
+      doc = type_names.size == 1 ? @query.find_type(type_names.first).try(&.doc) : nil
+      build_hover(["#{name} : #{type_names.uniq.join(" | ")}"], doc)
+    end
+
+    private def hover_for_class_var(name : String) : LSP::Hover?
+      inference = Inference.for(@source, @line_number + 1, @column_number + 1, @query)
+      return unless inference
+
+      type_names = inference.types_for_class_var(name)
       return if type_names.empty?
 
       doc = type_names.size == 1 ? @query.find_type(type_names.first).try(&.doc) : nil
@@ -157,7 +203,7 @@ module Crystalline::Lightweight
     end
 
     private def token_char?(char : Char)
-      char.ascii_alphanumeric? || char.in?('_', '?', '!', ':')
+      Resolver.token_char?(char)
     end
   end
 end

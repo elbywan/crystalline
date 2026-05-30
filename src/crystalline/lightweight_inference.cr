@@ -4,7 +4,12 @@ require "./lightweight_query"
 module Crystalline::Lightweight
   class Inference
     getter local_types = {} of String => Array(String)
+    getter instance_var_types = {} of String => Array(String)
+    getter class_var_types = {} of String => Array(String)
     getter current_def : Crystal::Def?
+    getter current_type_name : String?
+    getter? class_method_context = false
+    @current_type_body : Crystal::ASTNode? = nil
 
     def self.for(source : String, line : Int32, column : Int32, query : Query) : self?
       new(source, line, column, query).run
@@ -18,14 +23,11 @@ module Crystalline::Lightweight
       parser.wants_doc = false
       ast = parser.parse
 
-      @current_def = find_enclosing_def(ast)
+      return unless locate_context(ast)
       return unless current_def = @current_def
 
-      current_def.args.each do |arg|
-        next unless restriction = arg.restriction
-        @local_types[arg.name] = [restriction.to_s]
-      end
-
+      seed_arg_types(current_def)
+      process_initialize_defs unless class_method_context? || current_def.name == "initialize"
       process_node(current_def.body)
       self
     rescue Crystal::SyntaxException
@@ -36,41 +38,70 @@ module Crystalline::Lightweight
       @local_types[name]? || [] of String
     end
 
-    private def process_node(node : Crystal::ASTNode)
+    def types_for_instance_var(name : String) : Array(String)
+      @instance_var_types[name]? || [] of String
+    end
+
+    def types_for_class_var(name : String) : Array(String)
+      @class_var_types[name]? || [] of String
+    end
+
+    def self_types : {Array(String), Bool}
+      if type_name = @current_type_name
+        {[type_name], class_method_context?}
+      else
+        {[] of String, false}
+      end
+    end
+
+    private def process_node(node : Crystal::ASTNode, *, apply_cursor_bounds = true)
       case node
       when Crystal::Expressions
-        return unless starts_before_or_at_cursor?(node)
+        return unless !apply_cursor_bounds || starts_before_or_at_cursor?(node)
 
         node.expressions.each do |expression|
-          break unless starts_before_or_at_cursor?(expression)
-          process_node(expression)
+          break if apply_cursor_bounds && !starts_before_or_at_cursor?(expression)
+          process_node(expression, apply_cursor_bounds: apply_cursor_bounds)
         end
       when Crystal::Assign
-        return unless before_cursor?(node)
+        return unless !apply_cursor_bounds || before_cursor?(node)
 
-        if target = node.target.as?(Crystal::Var)
-          types = infer_types(node.value)
-          @local_types[target.name] = types unless types.empty?
+        types = infer_types(node.value)
+        return if types.empty?
+
+        case target = node.target
+        when Crystal::Var
+          @local_types[target.name] = types
+        when Crystal::InstanceVar
+          @instance_var_types[target.name] = types
+        when Crystal::ClassVar
+          @class_var_types[target.name] = types
         end
       when Crystal::If
-        return unless starts_before_or_at_cursor?(node)
+        return unless !apply_cursor_bounds || starts_before_or_at_cursor?(node)
 
-        process_node(node.then)
-        process_node(node.else)
+        process_node(node.then, apply_cursor_bounds: apply_cursor_bounds)
+        process_node(node.else, apply_cursor_bounds: apply_cursor_bounds)
       when Crystal::Unless
-        return unless starts_before_or_at_cursor?(node)
+        return unless !apply_cursor_bounds || starts_before_or_at_cursor?(node)
 
-        process_node(node.then)
-        process_node(node.else)
+        process_node(node.then, apply_cursor_bounds: apply_cursor_bounds)
+        process_node(node.else, apply_cursor_bounds: apply_cursor_bounds)
       else
-        return unless before_cursor?(node)
+        return unless !apply_cursor_bounds || before_cursor?(node)
       end
     end
 
     private def infer_types(node : Crystal::ASTNode) : Array(String)
       case node
       when Crystal::Var
-        types_for(node.name)
+        node.name == "self" ? self_types[0] : types_for(node.name)
+      when Crystal::InstanceVar
+        types_for_instance_var(node.name)
+      when Crystal::ClassVar
+        types_for_class_var(node.name)
+      when Crystal::Self
+        self_types[0]
       when Crystal::Path
         @query.find_type(node.to_s) ? [node.to_s] : [] of String
       when Crystal::NilLiteral
@@ -143,35 +174,92 @@ module Crystalline::Lightweight
       end
     end
 
-    private def find_enclosing_def(node : Crystal::ASTNode) : Crystal::Def?
-      best = nil.as(Crystal::Def?)
-      walker = uninitialized Proc(Crystal::ASTNode, Nil)
-      walker = ->(current : Crystal::ASTNode) do
-        if current.is_a?(Crystal::Def) && contains_cursor?(current)
-          best = current
-        end
-
+    private def locate_context(node : Crystal::ASTNode) : Bool
+      found = false
+      walker = uninitialized Proc(Crystal::ASTNode, String?, Crystal::ASTNode?, Nil)
+      walker = ->(current : Crystal::ASTNode, type_name : String?, type_body : Crystal::ASTNode?) do
         case current
+        when Crystal::ClassDef
+          qualified_name = qualify_type_name(current.name.to_s, type_name)
+          walker.call(current.body, qualified_name, current.body) if contains_cursor?(current.body) || starts_before_or_at_cursor?(current.body)
+        when Crystal::ModuleDef
+          qualified_name = qualify_type_name(current.name.to_s, type_name)
+          walker.call(current.body, qualified_name, current.body) if contains_cursor?(current.body) || starts_before_or_at_cursor?(current.body)
+        when Crystal::EnumDef
+          qualified_name = qualify_type_name(current.name.to_s, type_name)
+          current.members.each do |member|
+            walker.call(member, qualified_name, type_body) if contains_cursor?(member) || starts_before_or_at_cursor?(member)
+          end
         when Crystal::Expressions
-          current.expressions.each { |expression| walker.call(expression) if contains_cursor?(expression) || starts_before_or_at_cursor?(expression) }
+          current.expressions.each do |expression|
+            walker.call(expression, type_name, type_body) if contains_cursor?(expression) || starts_before_or_at_cursor?(expression)
+          end
         when Crystal::Def
-          current.body.try { |body| walker.call(body) if contains_cursor?(body) || starts_before_or_at_cursor?(body) }
+          if contains_cursor?(current)
+            @current_def = current
+            @current_type_name = type_name
+            @class_method_context = !current.receiver.nil?
+            @current_type_body = type_body
+            found = true
+          end
         when Crystal::If
-          walker.call(current.then) if contains_cursor?(current.then) || starts_before_or_at_cursor?(current.then)
-          walker.call(current.else) if contains_cursor?(current.else) || starts_before_or_at_cursor?(current.else)
+          walker.call(current.then, type_name, type_body) if contains_cursor?(current.then) || starts_before_or_at_cursor?(current.then)
+          walker.call(current.else, type_name, type_body) if contains_cursor?(current.else) || starts_before_or_at_cursor?(current.else)
         when Crystal::Unless
-          walker.call(current.then) if contains_cursor?(current.then) || starts_before_or_at_cursor?(current.then)
-          walker.call(current.else) if contains_cursor?(current.else) || starts_before_or_at_cursor?(current.else)
+          walker.call(current.then, type_name, type_body) if contains_cursor?(current.then) || starts_before_or_at_cursor?(current.then)
+          walker.call(current.else, type_name, type_body) if contains_cursor?(current.else) || starts_before_or_at_cursor?(current.else)
         end
       end
 
-      walker.call(node)
-      best
+      walker.call(node, nil, nil)
+      found
+    end
+
+    private def seed_arg_types(definition : Crystal::Def)
+      definition.args.each do |arg|
+        next unless restriction = arg.restriction
+        @local_types[arg.name] = [restriction.to_s]
+      end
+    end
+
+    private def process_initialize_defs
+      type_body = @current_type_body
+      return unless type_body
+
+      each_direct_def(type_body) do |definition|
+        next unless definition.name == "initialize"
+        next if definition.receiver
+
+        saved_local_types = @local_types.dup
+        begin
+          @local_types.clear
+          seed_arg_types(definition)
+          process_node(definition.body, apply_cursor_bounds: false)
+        ensure
+          @local_types = saved_local_types
+        end
+      end
+    end
+
+    private def each_direct_def(node : Crystal::ASTNode, & : Crystal::Def ->)
+      case node
+      when Crystal::Expressions
+        node.expressions.each do |expression|
+          yield expression if expression.is_a?(Crystal::Def)
+        end
+      when Crystal::Def
+        yield node
+      end
+    end
+
+    private def qualify_type_name(name : String, parent_type_name : String?) : String
+      return name if name.includes?("::") || parent_type_name.nil?
+      "#{parent_type_name}::#{name}"
     end
 
     private def contains_cursor?(node : Crystal::ASTNode)
       start_loc = node.location
-      end_loc = node.end_location
+      end_loc = node.end_location || start_loc
       return false unless start_loc && end_loc
 
       compare_position(start_loc.line_number, start_loc.column_number, @line, @column) <= 0 &&
@@ -179,7 +267,7 @@ module Crystalline::Lightweight
     end
 
     private def before_cursor?(node : Crystal::ASTNode)
-      end_loc = node.end_location
+      end_loc = node.end_location || node.location
       return false unless end_loc
 
       compare_position(end_loc.line_number, end_loc.column_number, @line, @column) < 0
