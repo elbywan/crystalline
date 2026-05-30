@@ -2,9 +2,10 @@ name: Specs
 
 on:
   push:
-    branches: [master]
+    branches: ["**"]
   pull_request:
     branches: [master]
+  workflow_dispatch:
 jobs:
   specs:
     runs-on: ubuntu-latest
