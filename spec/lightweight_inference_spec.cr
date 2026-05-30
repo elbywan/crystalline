@@ -145,4 +145,37 @@ describe Crystalline::Lightweight::Inference do
     inference.types_for("item").sort.should eq(["Foo", "Int32"])
     inference.types_for("value").sort.should eq(["Int32", "String"])
   end
+
+  it "expands union restrictions and explicit return types into individual names" do
+    index = build_lightweight_index <<-CRYSTAL
+      class Foo
+      end
+
+      class Bar
+      end
+
+      def maybe_item : Foo | Bar | Nil
+        Foo.new
+      end
+    CRYSTAL
+
+    source = <<-CRYSTAL
+      def demo(value : Foo | Bar | Nil)
+        result = maybe_item
+        result
+      end
+    CRYSTAL
+
+    inference = Crystalline::Lightweight::Inference.for(
+      source,
+      3,
+      8,
+      Crystalline::Lightweight::Query.new(index),
+    )
+
+    inference.should_not be_nil
+    inference = inference.not_nil!
+    inference.types_for("value").sort.should eq(["Bar", "Foo", "Nil"])
+    inference.types_for("result").sort.should eq(["Bar", "Foo", "Nil"])
+  end
 end

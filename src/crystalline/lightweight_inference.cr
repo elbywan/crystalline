@@ -139,19 +139,25 @@ module Crystalline::Lightweight
         infer_types(object).each do |type_name|
           @query.methods_for(type_name).each do |method|
             if method.name == node.name && (return_type = method.return_type)
-              return_types << return_type
+              return_types.concat(expand_type_names(return_type))
             end
           end
         end
       else
         @query.top_level_methods.each do |method|
           if method.name == node.name && (return_type = method.return_type)
-            return_types << return_type
+            return_types.concat(expand_type_names(return_type))
           end
         end
       end
 
       return_types.uniq
+    end
+
+    private def expand_type_names(type_name : String) : Array(String)
+      return [type_name] unless type_name.includes?(" | ")
+
+      type_name.split(" | ").map(&.strip).reject(&.empty?).uniq
     end
 
     private def number_kind_name(kind : Crystal::NumberKind) : String
@@ -253,7 +259,7 @@ module Crystalline::Lightweight
     private def seed_arg_types(definition : Crystal::Def)
       definition.args.each do |arg|
         next unless restriction = arg.restriction
-        @local_types[arg.name] = [restriction.to_s]
+        @local_types[arg.name] = expand_type_names(restriction.to_s)
       end
     end
 
