@@ -365,46 +365,12 @@ class Crystalline::Workspace
     text_document = @opened_documents[file_uri.to_s]?
     return unless text_document
 
-    # LSP::Log.info { "completion: #{trigger_character}"}
-
     document_lines = fix_source(text_document.contents).lines(chomp: false)
-    left_offset = 0
-    right_offset = 0
-    truncate_line = false
+    completion_context = CompletionContext.detect(document_lines[position.line], position.character, trigger_character)
+    return unless completion_context
 
-    if trigger_character
-      # Autocompletion triggered by a special character (. and :)
-      # We need to strip every occurence of the special character to please the parser.
-      prefix = document_lines[position.line][0...position.character].rstrip(trigger_character)
-      left_offset = position.character - prefix.size
-    else
-      # We need to determine which character (and by extension - autocompletion kind) is best suited depending on the location and its surroundings.
-      document_lines[position.line][0...position.character].each_char_with_index { |char, index|
-        unless char.ascii_alphanumeric? || char == '_' || char == '?' || char == '!'
-          trigger_character = char.to_s
-          left_offset = position.character - index
-        end
-      }
-      prefix = document_lines[position.line][0...(position.character - left_offset)]
-    end
-
-    suffix = document_lines[position.line][(position.character)..]?
-
-    # Remove the rest of the line (or part of it) to please the parser.
-    suffix.try &.each_char_with_index { |char, index|
-      unless char.ascii_alphanumeric? || char == '_' || char == '?' || char == '!' || char == ':'
-        truncate_line = true if char == '(' || char == '{' || char == '['
-        right_offset = index
-        break
-      end
-    }
-    suffix = suffix.try &.[right_offset...]?
-
-    # LSP::Log.info { "prefix(left offset #{left_offset}): #{prefix}"}
-    # LSP::Log.info { "suffix(right offset #{right_offset}): #{suffix}"}
-    # LSP::Log.info { "trigger character: #{trigger_character}"}
-
-    document_lines[position.line] = prefix + (!truncate_line ? (suffix || "\n") : "\n")
+    trigger_character = completion_context.trigger_character
+    document_lines[position.line] = completion_context.rewritten_line
     # Force the compiler load the file from this Hash.
     text_overrides = {
       file_uri.to_s => document_lines.join,
@@ -413,7 +379,7 @@ class Crystalline::Workspace
     location = Crystal::Location.new(
       file_uri.decoded_path,
       line_number: position.line + 1,
-      column_number: position.character - left_offset
+      column_number: completion_context.analysis_column,
     )
 
     # Trigger a compilation that will not fail fast.
@@ -440,10 +406,7 @@ class Crystalline::Workspace
       # LSP::Log.info { "Node type class: #{n.type?.try &.class}" }
       # LSP::Log.info { "Node type defs: #{n.type?.try &.defs}" }
 
-      range = LSP::Range.new(
-        start: LSP::Position.new(line: position.line, character: position.character - left_offset + 1),
-        end: LSP::Position.new(line: position.line, character: position.character + right_offset),
-      )
+      range = completion_context.completion_range(position.line)
 
       case trigger_character
       when "."
