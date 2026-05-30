@@ -25,5 +25,9 @@ module Crystalline::Lightweight
     def top_level_methods : Array(MethodInfo)
       @index.top_level_methods.dup
     end
+
+    def all_types : Array(TypeInfo)
+      @index.types.values.to_a
+    end
   end
 end

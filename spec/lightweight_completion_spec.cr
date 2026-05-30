@@ -190,4 +190,58 @@ describe Crystalline::Lightweight::Completion do
     ivar_items.should_not be_nil
     ivar_items.not_nil!.map(&.insert_text).compact.should contain("shout")
   end
+
+  it "completes locals, top-level methods, self, instance variables, and types without dot triggers" do
+    source = <<-CRYSTAL
+      class Greeter
+      end
+
+      def top_level_name : String
+        "name"
+      end
+
+      class Wrapper
+        def initialize
+          @greeter = Greeter.new
+        end
+
+        def demo(local_name : String)
+          local_copy = local_name
+          loc
+          top_lev
+          sel
+          @gre
+          Gre
+        end
+      end
+    CRYSTAL
+
+    query = build_lightweight_query(source)
+    lines = source.lines(chomp: false)
+
+    local_line_number = lines.index! { |item| item.strip == "loc" }
+    local_context = Crystalline::CompletionContext.detect(lines[local_line_number], lines[local_line_number].index("loc").not_nil! + 3, nil)
+    local_items = Crystalline::Lightweight::Completion.complete(source, local_line_number, local_context.not_nil!, query).not_nil!
+    local_items.map(&.insert_text).compact.should contain("local_copy")
+
+    method_line_number = lines.index! { |item| item.strip == "top_lev" }
+    method_context = Crystalline::CompletionContext.detect(lines[method_line_number], lines[method_line_number].index("top_lev").not_nil! + 7, nil)
+    method_items = Crystalline::Lightweight::Completion.complete(source, method_line_number, method_context.not_nil!, query).not_nil!
+    method_items.map(&.insert_text).compact.should contain("top_level_name")
+
+    self_line_number = lines.index! { |item| item.strip == "sel" }
+    self_context = Crystalline::CompletionContext.detect(lines[self_line_number], lines[self_line_number].index("sel").not_nil! + 3, nil)
+    self_items = Crystalline::Lightweight::Completion.complete(source, self_line_number, self_context.not_nil!, query).not_nil!
+    self_items.map(&.insert_text).compact.should contain("self")
+
+    ivar_line_number = lines.index! { |item| item.strip == "@gre" }
+    ivar_context = Crystalline::CompletionContext.detect(lines[ivar_line_number], lines[ivar_line_number].index("@gre").not_nil! + 4, nil)
+    ivar_items = Crystalline::Lightweight::Completion.complete(source, ivar_line_number, ivar_context.not_nil!, query).not_nil!
+    ivar_items.map(&.insert_text).compact.should contain("greeter")
+
+    type_line_number = lines.index! { |item| item.strip == "Gre" }
+    type_context = Crystalline::CompletionContext.detect(lines[type_line_number], lines[type_line_number].index("Gre").not_nil! + 3, nil)
+    type_items = Crystalline::Lightweight::Completion.complete(source, type_line_number, type_context.not_nil!, query).not_nil!
+    type_items.map(&.insert_text).compact.should contain("Greeter")
+  end
 end
