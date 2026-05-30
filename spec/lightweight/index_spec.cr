@@ -1,7 +1,7 @@
 require "spec"
-require "../src/crystalline/requires"
-require "../src/crystalline/main"
-require "../src/crystalline/lightweight_query"
+require "../../src/crystalline/requires"
+require "../../src/crystalline/main"
+require "../../src/crystalline/lightweight/query"
 
 private def build_lightweight_index(source : String)
   path = File.join(Dir.tempdir, "crystalline-lightweight-index-#{Random::Secure.hex(8)}.cr")

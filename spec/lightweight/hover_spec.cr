@@ -1,7 +1,7 @@
 require "spec"
-require "../src/crystalline/requires"
-require "../src/crystalline/main"
-require "../src/crystalline/lightweight_hover"
+require "../../src/crystalline/requires"
+require "../../src/crystalline/main"
+require "../../src/crystalline/lightweight/hover"
 
 private def build_lightweight_hover_query(source : String)
   path = File.join(Dir.tempdir, "crystalline-lightweight-hover-#{Random::Secure.hex(8)}.cr")

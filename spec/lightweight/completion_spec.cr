@@ -1,8 +1,8 @@
 require "spec"
-require "../src/crystalline/requires"
-require "../src/crystalline/main"
-require "../src/crystalline/completion_context"
-require "../src/crystalline/lightweight_completion"
+require "../../src/crystalline/requires"
+require "../../src/crystalline/main"
+require "../../src/crystalline/completion_context"
+require "../../src/crystalline/lightweight/completion"
 
 private def build_lightweight_query(source : String)
   path = File.join(Dir.tempdir, "crystalline-lightweight-completion-#{Random::Secure.hex(8)}.cr")

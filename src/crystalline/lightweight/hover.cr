@@ -1,6 +1,6 @@
 require "lsp/server"
-require "./lightweight_query"
-require "./lightweight_resolver"
+require "./query"
+require "./resolver"
 
 module Crystalline::Lightweight
   class Hover

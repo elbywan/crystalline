@@ -1,5 +1,5 @@
-require "./lightweight_inference"
-require "./lightweight_query"
+require "./inference"
+require "./query"
 
 module Crystalline::Lightweight
   module Resolver

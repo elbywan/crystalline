@@ -4,8 +4,8 @@ require "./text_document"
 require "./progress"
 require "./project"
 require "./result_cache"
-require "./lightweight_completion"
-require "./lightweight_hover"
+require "./lightweight/completion"
+require "./lightweight/hover"
 require "./analysis/*"
 
 class Crystalline::Workspace

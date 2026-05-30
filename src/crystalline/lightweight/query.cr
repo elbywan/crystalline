@@ -1,4 +1,4 @@
-require "./lightweight_index"
+require "./index"
 
 module Crystalline::Lightweight
   class Query

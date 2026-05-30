@@ -1,6 +1,7 @@
 require "log"
 require "lsp/server"
 require "./ext/*"
+require "./lightweight/*"
 require "./*"
 
 module Crystalline

@@ -1,8 +1,8 @@
 require "spec"
-require "../src/crystalline/requires"
-require "../src/crystalline/main"
-require "../src/crystalline/lightweight_query"
-require "../src/crystalline/lightweight_inference"
+require "../../src/crystalline/requires"
+require "../../src/crystalline/main"
+require "../../src/crystalline/lightweight/query"
+require "../../src/crystalline/lightweight/inference"
 
 private def build_lightweight_index(source : String)
   path = File.join(Dir.tempdir, "crystalline-lightweight-inference-#{Random::Secure.hex(8)}.cr")

@@ -1,5 +1,5 @@
 require "compiler/crystal/syntax"
-require "./lightweight_query"
+require "./query"
 
 module Crystalline::Lightweight
   class Inference

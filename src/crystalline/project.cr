@@ -1,6 +1,6 @@
 require "yaml"
-require "./lightweight_index"
-require "./lightweight_query"
+require "./lightweight/index"
+require "./lightweight/query"
 
 class Crystalline::Project
   # The project root filesystem uri.

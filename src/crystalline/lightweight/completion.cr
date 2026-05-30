@@ -1,7 +1,7 @@
 require "lsp/server"
-require "./completion_context"
-require "./lightweight_query"
-require "./lightweight_resolver"
+require "../completion_context"
+require "./query"
+require "./resolver"
 
 module Crystalline::Lightweight
   class Completion
