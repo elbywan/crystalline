@@ -25,7 +25,7 @@ class Crystalline::TextDocument
     @inner_contents.size
   end
 
-  def update_contents(content_changes : Array({String, LSP::Range?}), version : Number? = nil)
+  def update_contents(content_changes : Array({String, LSP::Range?}), version : Int32? = nil)
     content_changes.each { |change|
       update_contents(*change, version: version)
     }
@@ -34,11 +34,11 @@ class Crystalline::TextDocument
     loop do
       break unless @pending_changes.first?.try(&.priority.== self.version + 1)
       item = @pending_changes.shift
-      partial_update(*item.value, version: item.priority)
+      partial_update(item.value[0], item.value[1], version: item.priority.to_i32)
     end
   end
 
-  private def update_contents(contents : String, range : LSP::Range? = nil, version : Number? = nil)
+  private def update_contents(contents : String, range : LSP::Range? = nil, version : Int32? = nil)
     if range
       # Incremental update
       if version && check_version(version)
@@ -57,12 +57,12 @@ class Crystalline::TextDocument
     end
   end
 
-  private def check_version(version : Number)
+  private def check_version(version : Int32)
     @version ||= version
     @version == version - 1 || @version == version
   end
 
-  private def partial_update(contents : String, range : LSP::Range, version : Number? = nil)
+  private def partial_update(contents : String, range : LSP::Range, version : Int32? = nil)
     prefix = @inner_contents[range.start.line]?.try &.[...range.start.character].chomp || ""
     suffix = @inner_contents[range.end.line]?.try &.[range.end.character..]? || @inner_contents[range.end.line]? || ""
     replacement_lines = String.build { |str|
