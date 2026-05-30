@@ -95,4 +95,43 @@ describe Crystalline::Lightweight::Completion do
     items = items.not_nil!
     items.map(&.insert_text).compact.should contain("build")
   end
+
+  it "completes chained receivers using explicit return types" do
+    source = <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+      end
+
+      class Factory
+        def build : Greeter
+          Greeter.new
+        end
+      end
+
+      def demo
+        factory = Factory.new
+        factory.build.sh
+      end
+    CRYSTAL
+
+    query = build_lightweight_query(source)
+    lines = source.lines(chomp: false)
+    line_number = lines.index! { |item| item.includes?("factory.build.sh") }
+    line = lines[line_number]
+    context = Crystalline::CompletionContext.detect(line, line.size - 1, nil)
+    context.should_not be_nil
+
+    items = Crystalline::Lightweight::Completion.complete(
+      source,
+      line_number,
+      context.not_nil!,
+      query,
+    )
+
+    items.should_not be_nil
+    items = items.not_nil!
+    items.map(&.insert_text).compact.should contain("shout")
+  end
 end

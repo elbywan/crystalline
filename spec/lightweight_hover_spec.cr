@@ -118,4 +118,34 @@ describe Crystalline::Lightweight::Hover do
     value = hover_value(hover.not_nil!)
     value.should contain("Greeter")
   end
+
+  it "hovers chained receiver methods using explicit return types" do
+    source = <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+      end
+
+      class Factory
+        def build : Greeter
+          Greeter.new
+        end
+      end
+
+      def demo
+        factory = Factory.new
+        factory.build.shout
+      end
+    CRYSTAL
+
+    query = build_lightweight_hover_query(source)
+    lines = source.lines(chomp: false)
+    line_number = lines.index! { |item| item.strip == "factory.build.shout" }
+    column_number = lines[line_number].rindex("shout").not_nil! + 2
+
+    hover = Crystalline::Lightweight::Hover.hover(source, line_number, column_number, query)
+    hover.should_not be_nil
+    hover_value(hover.not_nil!).should contain("Greeter#shout() : String")
+  end
 end
