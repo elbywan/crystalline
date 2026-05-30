@@ -24,7 +24,7 @@ class Crystalline::CompletionContext
     @replace_end = fragment_end
 
     tokens = tokens_for_line
-    return if inside_comment?(tokens)
+    return if inside_comment?(tokens) || inside_quoted_literal?
 
     if @trigger_character.nil?
       @trigger_character = inferred_trigger(tokens, fragment_start)
@@ -138,6 +138,50 @@ class Crystalline::CompletionContext
 
   private def inside_comment?(tokens : Array(TokenSpan))
     tokens.any? { |token| token.type.comment? && @cursor >= token.start_char }
+  end
+
+  private def inside_quoted_literal?
+    in_single = false
+    in_double = false
+    escaped = false
+
+    @line.each_char_with_index do |char, index|
+      break if index >= @cursor
+
+      if escaped
+        escaped = false
+        next
+      end
+
+      if in_single
+        case char
+        when '\\'
+          escaped = true
+        when '\''
+          in_single = false
+        end
+        next
+      end
+
+      if in_double
+        case char
+        when '\\'
+          escaped = true
+        when '"'
+          in_double = false
+        end
+        next
+      end
+
+      case char
+      when '\''
+        in_single = true
+      when '"'
+        in_double = true
+      end
+    end
+
+    in_single || in_double
   end
 
   private def inferred_trigger(tokens : Array(TokenSpan), fragment_start : Int32)
