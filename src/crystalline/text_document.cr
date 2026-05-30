@@ -53,7 +53,7 @@ class Crystalline::TextDocument
       end
     else
       # Full update
-      full_update(contents)
+      full_update(contents, version)
     end
   end
 
@@ -63,7 +63,7 @@ class Crystalline::TextDocument
   end
 
   private def partial_update(contents : String, range : LSP::Range, version : Int32? = nil)
-    prefix = @inner_contents[range.start.line]?.try &.[...range.start.character].chomp || ""
+    prefix = @inner_contents[range.start.line]?.try &.[...range.start.character] || ""
     suffix = @inner_contents[range.end.line]?.try &.[range.end.character..]? || @inner_contents[range.end.line]? || ""
     replacement_lines = String.build { |str|
       str << prefix << contents << suffix
@@ -72,7 +72,9 @@ class Crystalline::TextDocument
     @version = version if version
   end
 
-  private def full_update(contents : String)
+  private def full_update(contents : String, version : Int32? = nil)
+    @pending_changes.clear
     self.contents = contents
+    @version = version if version
   end
 end
