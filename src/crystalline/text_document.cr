@@ -25,6 +25,18 @@ class Crystalline::TextDocument
     @inner_contents.size
   end
 
+  def eof_position : LSP::Position
+    if (last_line = @inner_contents.last?)
+      if last_line.ends_with?("\n")
+        LSP::Position.new(line: @inner_contents.size, character: 0)
+      else
+        LSP::Position.new(line: @inner_contents.size - 1, character: last_line.size)
+      end
+    else
+      LSP::Position.new(line: 0, character: 0)
+    end
+  end
+
   def update_contents(content_changes : Array({String, LSP::Range?}), version : Int32? = nil)
     content_changes.each { |change|
       update_contents(*change, version: version)

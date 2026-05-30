@@ -7,6 +7,27 @@ private def doc(contents : String)
 end
 
 describe Crystalline::TextDocument do
+  it "computes EOF position for empty contents" do
+    document = doc("")
+
+    document.eof_position.line.should eq(0)
+    document.eof_position.character.should eq(0)
+  end
+
+  it "computes EOF position for contents ending with a newline" do
+    document = doc("foo\nbar\n")
+
+    document.eof_position.line.should eq(2)
+    document.eof_position.character.should eq(0)
+  end
+
+  it "computes EOF position for contents without a trailing newline" do
+    document = doc("foo\nbar")
+
+    document.eof_position.line.should eq(1)
+    document.eof_position.character.should eq(3)
+  end
+
   it "preserves the exact line prefix during partial updates" do
     document = doc("foo\nbar\n")
 

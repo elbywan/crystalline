@@ -38,7 +38,7 @@ class Crystalline::Controller
         workspace.format_document(message.params).try { |(formatted_document, document)|
           range = LSP::Range.new(
             start: LSP::Position.new(line: 0, character: 0),
-            end: LSP::Position.new(line: document.lines_nb + 1, character: 0),
+            end: document.eof_position,
           )
           [
             LSP::TextEdit.new(
