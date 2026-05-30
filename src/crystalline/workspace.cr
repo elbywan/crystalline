@@ -9,6 +9,8 @@ require "./analysis/*"
 class Crystalline::Workspace
   # The previous compilation results, indexed by compilation entry point.
   @result_cache : Crystalline::ResultCache = Crystalline::ResultCache.new
+  # Last successful semantic analysis results, used as a fast fallback for interactive features.
+  @semantic_cache : Hash(String, Crystal::Compiler::Result) = {} of String => Crystal::Compiler::Result
   # The workspace filesystem uri.
   getter root_uri : URI?
   # A list of documents that are openened in the text editor.
@@ -193,6 +195,10 @@ class Crystalline::Workspace
           @result_cache.set(target_string, result, unless_invalidated_since: compilation_start)
         end
 
+        if result && text_overrides.nil? && !top_level
+          @semantic_cache[target_string] = result
+        end
+
         if result
           if project.try(&.entry_point?)
             # Store the project dependencies.
@@ -214,6 +220,14 @@ class Crystalline::Workspace
         progress.send_progress_end(server)
         nil
       end
+    end
+  end
+
+  private def semantic_cache_key(file_uri : URI) : String
+    if (project = Project.best_fit_for_file(@projects, file_uri)) && (entry_point = project.entry_point?)
+      entry_point.to_s
+    else
+      file_uri.to_s
     end
   end
 
@@ -370,11 +384,6 @@ class Crystalline::Workspace
     return unless completion_context
 
     trigger_character = completion_context.trigger_character
-    document_lines[position.line] = completion_context.rewritten_line
-    # Force the compiler load the file from this Hash.
-    text_overrides = {
-      file_uri.to_s => document_lines.join,
-    }
 
     location = Crystal::Location.new(
       file_uri.decoded_path,
@@ -382,18 +391,29 @@ class Crystalline::Workspace
       column_number: completion_context.analysis_column,
     )
 
-    # Trigger a compilation that will not fail fast.
-    result = self.compile(
-      server,
-      file_uri,
-      in_memory: true,
-      discard_nil_cached_result: true,
-      wants_doc: true,
-      text_overrides: text_overrides,
-      # Prevent showing diagnostics and caching results since the diagnostics can be inaccurate
-      ignore_diagnostics: true,
-      do_not_cache_result: true
-    )
+    result = @semantic_cache[semantic_cache_key(file_uri)]?
+
+    unless result
+      document_lines[position.line] = completion_context.rewritten_line
+      # Force the compiler load the file from this Hash.
+      text_overrides = {
+        file_uri.to_s => document_lines.join,
+      }
+
+      # Trigger a compilation that will not fail fast.
+      result = self.compile(
+        server,
+        file_uri,
+        in_memory: true,
+        discard_nil_cached_result: true,
+        wants_doc: true,
+        text_overrides: text_overrides,
+        # Prevent showing diagnostics and caching results since the diagnostics can be inaccurate
+        ignore_diagnostics: true,
+        do_not_cache_result: true
+      )
+    end
+
     return unless result
 
     nodes, _ = Analysis.nodes_at_cursor(result, location)
