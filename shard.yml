@@ -19,9 +19,9 @@ dependencies:
 development_dependencies:
   sentry:
     github: samueleaton/sentry
-    branch: master
+    version: ~> 0.5.0
 
-crystal: ">= 0.36.1, < 2.0.0"
+crystal: ">= 1.20.0, < 2.0.0"
 
 crystalline:
   flags:

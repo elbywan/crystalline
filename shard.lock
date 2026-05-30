@@ -10,9 +10,9 @@ shards:
 
   priority-queue:
     git: https://github.com/spider-gazelle/priority-queue.git
-    version: 1.0.1
+    version: 1.1.2
 
   sentry:
     git: https://github.com/samueleaton/sentry.git
-    version: 0.3.2+git.commit.e448ce83486f99ef016c311e10ec0cac805cded3
+    version: 0.5.0
 
