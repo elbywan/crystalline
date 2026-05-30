@@ -13,6 +13,16 @@ describe Crystalline::CompletionContext do
     context.should be_nil
   end
 
+  it "returns nil inside regex literals" do
+    context = Crystalline::CompletionContext.detect("/foo./", 5, nil)
+    context.should be_nil
+  end
+
+  it "returns nil inside percent string literals" do
+    context = Crystalline::CompletionContext.detect("%(foo.bar)", 8, nil)
+    context.should be_nil
+  end
+
   it "still completes after a closed string literal" do
     context = Crystalline::CompletionContext.detect("\"a\".up", 6, nil)
     context.should_not be_nil
@@ -22,6 +32,28 @@ describe Crystalline::CompletionContext do
     context.analysis_column.should eq(3)
     context.replace_start.should eq(4)
     context.replace_end.should eq(6)
+  end
+
+  it "still completes after a closed regex literal" do
+    context = Crystalline::CompletionContext.detect("/a/.up", 6, nil)
+    context.should_not be_nil
+    context = context.not_nil!
+
+    context.trigger_character.should eq(".")
+    context.analysis_column.should eq(3)
+    context.replace_start.should eq(4)
+    context.replace_end.should eq(6)
+  end
+
+  it "still completes after a closed percent string literal" do
+    context = Crystalline::CompletionContext.detect("%(a).up", 7, nil)
+    context.should_not be_nil
+    context = context.not_nil!
+
+    context.trigger_character.should eq(".")
+    context.analysis_column.should eq(4)
+    context.replace_start.should eq(5)
+    context.replace_end.should eq(7)
   end
 
   it "detects dot completion from an identifier fragment" do
