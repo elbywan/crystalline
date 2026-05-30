@@ -27,6 +27,7 @@ module Crystalline::Lightweight
       return unless current_def = @current_def
 
       seed_arg_types(current_def)
+      seed_type_vars_from_summary
       process_initialize_defs unless class_method_context? || current_def.name == "initialize"
       process_node(current_def.body)
       self
@@ -174,9 +175,11 @@ module Crystalline::Lightweight
     end
 
     private def expand_type_names(type_name : String) : Array(String)
-      return [type_name] unless type_name.includes?(" | ")
+      normalized = type_name.strip
+      normalized = normalized[1...-1] if normalized.starts_with?('(') && normalized.ends_with?(')')
+      return [normalized] unless normalized.includes?(" | ")
 
-      type_name.split(" | ").map(&.strip).reject(&.empty?).uniq
+      normalized.split(" | ").map(&.strip).reject(&.empty?).uniq
     end
 
     private def number_kind_name(kind : Crystal::NumberKind) : String
@@ -412,6 +415,25 @@ module Crystalline::Lightweight
         next unless restriction = arg.restriction
         @local_types[arg.name] = expand_type_names(restriction.to_s)
       end
+    end
+
+    private def seed_type_vars_from_summary
+      return unless type_name = @current_type_name
+
+      if class_method_context?
+        @class_var_types = merge_branch_types(@class_var_types, @class_var_types, query_class_var_types(type_name))
+      else
+        @instance_var_types = merge_branch_types(@instance_var_types, @instance_var_types, query_instance_var_types(type_name))
+        @class_var_types = merge_branch_types(@class_var_types, @class_var_types, query_class_var_types(type_name))
+      end
+    end
+
+    private def query_instance_var_types(type_name : String)
+      @query.instance_vars_for(type_name)
+    end
+
+    private def query_class_var_types(type_name : String)
+      @query.class_vars_for(type_name)
     end
 
     private def process_initialize_defs

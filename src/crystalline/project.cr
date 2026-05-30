@@ -7,9 +7,11 @@ class Crystalline::Project
   getter root_uri : URI
   # Lightweight top-level semantic index for interactive features.
   property lightweight_index : Crystalline::Lightweight::Index?
+  # Compiler-backed semantic summary built from the last successful full compile.
+  property semantic_summary : Crystalline::Lightweight::Summary?
 
   def lightweight_query : Crystalline::Lightweight::Query?
-    @lightweight_index.try { |index| Crystalline::Lightweight::Query.new(index) }
+    @lightweight_index.try { |index| Crystalline::Lightweight::Query.new(index, @semantic_summary) }
   end
   # The dependencies of the project, meaning the list of files required by the compilation target (entry point).
   property dependencies : Set(String) = Set(String).new

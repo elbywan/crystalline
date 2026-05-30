@@ -200,6 +200,7 @@ class Crystalline::Workspace
 
         if result && text_overrides.nil? && !top_level
           @semantic_cache[target_string] = result
+          project.try &.semantic_summary = Crystalline::Lightweight::Summary.from_result(result)
         end
 
         if result

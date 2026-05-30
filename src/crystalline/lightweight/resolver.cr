@@ -93,9 +93,8 @@ module Crystalline::Lightweight
       end
 
       {
-        query.top_level_methods.select { |method| method.name == receiver && method.args.empty? }.compact_map { |method|
-          return_type = method.return_type
-          return_type if return_type && query.find_type(return_type)
+        query.top_level_methods.select { |method| method.name == receiver && method.args.empty? }.flat_map { |method|
+          return_type_names(method.return_type, query)
         }.uniq,
         false,
       }
@@ -112,13 +111,21 @@ module Crystalline::Lightweight
       return_types = type_names.flat_map do |type_name|
         query.methods_for(type_name, class_method: class_method).select { |method|
           method.name == method_name && method.args.empty?
-        }.compact_map do |method|
-          return_type = method.return_type
-          return_type if return_type && query.find_type(return_type)
+        }.flat_map do |method|
+          return_type_names(method.return_type, query)
         end
       end
 
       {return_types.uniq, false}
+    end
+
+    private def return_type_names(return_type : String?, query : Query) : Array(String)
+      return [] of String unless return_type
+
+      normalized = return_type.strip
+      normalized = normalized[1...-1] if normalized.starts_with?('(') && normalized.ends_with?(')')
+      names = normalized.includes?(" | ") ? normalized.split(" | ").map(&.strip) : [normalized]
+      names.select { |type_name| query.find_type(type_name) != nil }
     end
   end
 end
