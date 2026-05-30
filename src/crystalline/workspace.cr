@@ -95,6 +95,7 @@ class Crystalline::Workspace
     lib_path = project.default_lib_path
     Analysis.compile(server, target, lib_path: lib_path, ignore_diagnostics: true, wants_doc: false, top_level: true, compiler_flags: project.flags).try { |result|
       project.dependencies = result.program.requires
+      project.lightweight_index = Crystalline::Lightweight::Index.from_program(result.program)
     }
   rescue
     nil

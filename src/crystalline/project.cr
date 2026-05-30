@@ -1,8 +1,16 @@
 require "yaml"
+require "./lightweight_index"
+require "./lightweight_query"
 
 class Crystalline::Project
   # The project root filesystem uri.
   getter root_uri : URI
+  # Lightweight top-level semantic index for interactive features.
+  property lightweight_index : Crystalline::Lightweight::Index?
+
+  def lightweight_query : Crystalline::Lightweight::Query?
+    @lightweight_index.try { |index| Crystalline::Lightweight::Query.new(index) }
+  end
   # The dependencies of the project, meaning the list of files required by the compilation target (entry point).
   property dependencies : Set(String) = Set(String).new
   # Determines the project entry point.
