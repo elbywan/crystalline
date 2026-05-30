@@ -288,4 +288,26 @@ describe Crystalline::Lightweight::Completion do
     truthy_items = Crystalline::Lightweight::Completion.complete(truthy_source, truthy_line_number, truthy_context.not_nil!, truthy_query).not_nil!
     truthy_items.map(&.insert_text).compact.should contain("shout")
   end
+
+  it "completes receivers inferred from logical or fallbacks" do
+    source = <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+      end
+
+      def demo(candidate : Greeter | Nil)
+        resolved = candidate || Greeter.new
+        resolved.sh
+      end
+    CRYSTAL
+
+    query = build_lightweight_query(source)
+    lines = source.lines(chomp: false)
+    line_number = lines.index! { |item| item.includes?("resolved.sh") }
+    context = Crystalline::CompletionContext.detect(lines[line_number], lines[line_number].size - 1, nil)
+    items = Crystalline::Lightweight::Completion.complete(source, line_number, context.not_nil!, query).not_nil!
+    items.map(&.insert_text).compact.should contain("shout")
+  end
 end

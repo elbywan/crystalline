@@ -118,9 +118,28 @@ module Crystalline::Lightweight
         ["Hash"]
       when Crystal::Call
         infer_call_types(node)
+      when Crystal::Or
+        infer_or_types(node)
+      when Crystal::And
+        infer_and_types(node)
       else
         [] of String
       end
+    end
+
+    private def infer_or_types(node : Crystal::Or) : Array(String)
+      left_types = infer_types(node.left)
+      right_types = infer_types(node.right)
+
+      (left_types.reject(&.==("Nil")) + right_types).uniq
+    end
+
+    private def infer_and_types(node : Crystal::And) : Array(String)
+      left_types = infer_types(node.left)
+      right_types = infer_types(node.right)
+      nil_types = left_types.select(&.==("Nil"))
+
+      (nil_types + right_types).uniq
     end
 
     private def infer_call_types(node : Crystal::Call) : Array(String)

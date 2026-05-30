@@ -230,4 +230,32 @@ describe Crystalline::Lightweight::Inference do
     truthy_inference.types_for("candidate").should eq(["Greeter"])
     truthy_inference.types_for("truthy_candidate").should eq(["Greeter"])
   end
+
+  it "infers fallback types from logical or expressions" do
+    index = build_lightweight_index <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+      end
+    CRYSTAL
+
+    source = <<-CRYSTAL
+      def demo(candidate : Greeter | Nil)
+        resolved = candidate || Greeter.new
+        resolved
+      end
+    CRYSTAL
+
+    inference = Crystalline::Lightweight::Inference.for(
+      source,
+      3,
+      12,
+      Crystalline::Lightweight::Query.new(index),
+    )
+
+    inference.should_not be_nil
+    inference = inference.not_nil!
+    inference.types_for("resolved").should eq(["Greeter"])
+  end
 end
