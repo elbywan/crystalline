@@ -5,6 +5,7 @@ require "./progress"
 require "./project"
 require "./result_cache"
 require "./lightweight_completion"
+require "./lightweight_hover"
 require "./analysis/*"
 
 class Crystalline::Workspace
@@ -255,6 +256,12 @@ class Crystalline::Workspace
   end
 
   def hover(server : LSP::Server, file_uri : URI, position : LSP::Position)
+    if (text_document = @opened_documents[file_uri.to_s]?) && (query = text_document.project?.try &.lightweight_query)
+      if hover = Crystalline::Lightweight::Hover.hover(fix_source(text_document.contents), position.line, position.character, query)
+        return hover
+      end
+    end
+
     result = self.compile(server, file_uri, in_memory: true, wants_doc: true)
     location = Crystal::Location.new(
       file_uri.decoded_path,

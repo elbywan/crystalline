@@ -1,0 +1,163 @@
+require "lsp/server"
+require "./lightweight_query"
+require "./lightweight_resolver"
+
+module Crystalline::Lightweight
+  class Hover
+    def self.hover(source : String, line_number : Int32, column_number : Int32, query : Query) : LSP::Hover?
+      new(source, line_number, column_number, query).hover
+    end
+
+    def initialize(@source : String, @line_number : Int32, @column_number : Int32, @query : Query)
+    end
+
+    def hover : LSP::Hover?
+      line = @source.lines(chomp: false)[@line_number]?
+      return unless line
+
+      span = token_span(line)
+      return unless span
+
+      start_index, end_index = span
+      token = line[start_index, end_index - start_index]?
+      return unless token && !token.empty?
+
+      if start_index > 0 && line[start_index - 1] == '.'
+        receiver = Resolver.receiver_from_prefix(line[0, start_index - 1])
+        return hover_for_method(receiver, token, start_index - 1) unless receiver.empty?
+      end
+
+      if Resolver.type_name?(token)
+        return hover_for_type(token)
+      end
+
+      if Resolver.local_name?(token)
+        hover_for_local(token) || hover_for_top_level_method(token)
+      end
+    end
+
+    private def hover_for_method(receiver : String, method_name : String, analysis_column : Int32) : LSP::Hover?
+      type_names, class_method = Resolver.receiver_types(@source, @line_number, analysis_column, receiver, @query)
+      return if type_names.empty?
+
+      methods = type_names.flat_map do |type_name|
+        @query.methods_for(type_name, class_method: class_method).select { |method| method.name == method_name }
+      end
+      return if methods.empty?
+
+      build_hover(
+        methods.map { |method| format_method(method, include_owner: true) },
+        methods.compact_map(&.doc).first?,
+      )
+    end
+
+    private def hover_for_type(type_name : String) : LSP::Hover?
+      type = @query.find_type(type_name)
+      return unless type
+
+      build_hover([type.name], type.doc)
+    end
+
+    private def hover_for_local(name : String) : LSP::Hover?
+      inference = Inference.for(@source, @line_number + 1, @column_number + 1, @query)
+      return unless inference
+
+      type_names = inference.types_for(name)
+      return if type_names.empty?
+
+      doc = type_names.size == 1 ? @query.find_type(type_names.first).try(&.doc) : nil
+      build_hover(["#{name} : #{type_names.uniq.join(" | ")}"], doc)
+    end
+
+    private def hover_for_top_level_method(method_name : String) : LSP::Hover?
+      methods = @query.top_level_methods.select { |method| method.name == method_name }
+      return if methods.empty?
+
+      build_hover(
+        methods.map { |method| format_method(method, include_owner: true) },
+        methods.compact_map(&.doc).first?,
+      )
+    end
+
+    private def build_hover(signatures : Array(String), doc : String?) : LSP::Hover
+      contents = [] of String
+      contents << code_markdown(signatures.uniq.join("\n"), language: "crystal")
+
+      if doc
+        contents << "----------"
+        contents << doc
+      end
+
+      LSP::Hover.new(
+        contents: LSP::MarkupContent.new(
+          kind: LSP::MarkupKind::MarkDown,
+          value: contents.join("\n"),
+        ),
+      )
+    end
+
+    private def code_markdown(str : String, *, language = "") : String
+      <<-MARKDOWN
+      ```#{language}
+      #{str}
+      ```
+      MARKDOWN
+    end
+
+    private def format_method(method : MethodInfo, *, include_owner = false) : String
+      args = method.args.map do |arg|
+        if restriction = arg.restriction
+          "#{arg.name} : #{restriction}"
+        else
+          arg.name
+        end
+      end.join(", ")
+
+      String.build do |str|
+        if include_owner
+          str << method.owner
+          str << (method.class_method ? "." : "#")
+        end
+
+        str << method.name
+        str << "(#{args})"
+        str << " : #{method.return_type}" if method.return_type
+      end
+    end
+
+    private def token_span(line : String) : {Int32, Int32}?
+      index = normalized_column(line)
+      return unless index
+      return unless token_char?(line[index])
+
+      start_index = index
+      while start_index > 0 && token_char?(line[start_index - 1])
+        start_index -= 1
+      end
+
+      end_index = index + 1
+      while (char = line[end_index]?) && token_char?(char)
+        end_index += 1
+      end
+
+      {start_index, end_index}
+    end
+
+    private def normalized_column(line : String) : Int32?
+      return if line.empty?
+
+      index = @column_number
+      index = line.size - 1 if index >= line.size
+      return if index < 0
+
+      return index if token_char?(line[index])
+      return index - 1 if index > 0 && token_char?(line[index - 1])
+
+      nil
+    end
+
+    private def token_char?(char : Char)
+      char.ascii_alphanumeric? || char.in?('_', '?', '!', ':')
+    end
+  end
+end

@@ -1,7 +1,7 @@
 require "lsp/server"
 require "./completion_context"
-require "./lightweight_inference"
 require "./lightweight_query"
+require "./lightweight_resolver"
 
 module Crystalline::Lightweight
   class Completion
@@ -56,37 +56,11 @@ module Crystalline::Lightweight
     end
 
     private def resolve_receiver(receiver : String) : {Array(String), Bool}
-      if type_name?(receiver)
-        return {[receiver], true} if @query.find_type(receiver)
-        return {[] of String, true}
-      end
-
-      return {[] of String, false} unless local_name?(receiver)
-
-      inference = Inference.for(
-        @source,
-        @line_number + 1,
-        @context.analysis_column + 1,
-        @query,
-      )
-
-      return {[] of String, false} unless inference
-
-      {
-        inference.types_for(receiver).select { |type_name| @query.find_type(type_name) != nil },
-        false,
-      }
+      Resolver.receiver_types(@source, @line_number, @context.analysis_column, receiver, @query)
     end
 
     private def receiver_expression : String
-      prefix = @context.analysis_prefix
-      start = prefix.size
-
-      while start > 0 && receiver_char?(prefix[start - 1])
-        start -= 1
-      end
-
-      prefix[start..]? || ""
+      Resolver.receiver_from_prefix(@context.analysis_prefix)
     end
 
     private def format_method(method : MethodInfo, *, include_owner = false) : String
@@ -112,16 +86,5 @@ module Crystalline::Lightweight
       signature
     end
 
-    private def receiver_char?(char : Char)
-      char.ascii_alphanumeric? || char.in?('_', '?', '!', '@', ':')
-    end
-
-    private def local_name?(receiver : String)
-      !!(receiver =~ /\A[a-z_][a-zA-Z0-9_?!]*\z/)
-    end
-
-    private def type_name?(receiver : String)
-      !!(receiver =~ /\A[A-Z][a-zA-Z0-9_]*(?:::[A-Z][a-zA-Z0-9_]*)*\z/)
-    end
   end
 end
