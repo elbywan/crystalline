@@ -13,7 +13,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v6.0.2
       - name: Install Crystal
         env:
           HOMEBREW_NO_INSTALL_UPGRADE: 1
@@ -23,10 +23,10 @@ jobs:
         run: shards install --production --ignore-crystal-version
       - name: Build the binary
         run: |
-          export LLVM_CONFIG="$(brew --prefix)/opt/llvm@20/bin/llvm-config"
+          export LLVM_CONFIG="$(brew --prefix llvm)/bin/llvm-config"
           shards build crystalline --release --no-debug -Dpreview_mt --stats --progress --ignore-crystal-version
       - name: Upload a Build Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: crystalline_${{ matrix.runner == 'macos-latest' && 'arm64' || 'x86_64' }}-apple-darwin
           path: ./bin/crystalline
@@ -34,14 +34,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v6.0.2
       - name: Build the static binary
         run: docker build -t crystalline .
       - name: Copy binary to host
         run: |
           docker run -v $PWD:/app/host --rm crystalline:latest cp ./bin/crystalline ./host/crystalline
       - name: Upload a Build Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: crystalline_x86_64-unknown-linux-musl
           path: ./crystalline
@@ -50,7 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8.0.1
         with:
           path: ./artifacts
       - name: Compress artifacts
