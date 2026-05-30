@@ -5,7 +5,7 @@ require "../src/crystalline/lightweight_query"
 require "../src/crystalline/lightweight_inference"
 
 private def build_lightweight_index(source : String)
-  path = File.join(Dir.current, ".tmp-crystalline-lightweight-inference-#{Random::Secure.hex(8)}.cr")
+  path = File.join(Dir.tempdir, "crystalline-lightweight-inference-#{Random::Secure.hex(8)}.cr")
   File.write(path, source)
 
   begin
