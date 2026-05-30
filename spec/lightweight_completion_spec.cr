@@ -244,4 +244,48 @@ describe Crystalline::Lightweight::Completion do
     type_items = Crystalline::Lightweight::Completion.complete(source, type_line_number, type_context.not_nil!, query).not_nil!
     type_items.map(&.insert_text).compact.should contain("Greeter")
   end
+
+  it "completes narrowed receivers inside conditional branches" do
+    isa_source = <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+      end
+
+      def demo(candidate : Greeter | Nil | Int32)
+        if candidate.is_a?(Greeter)
+          candidate.sh
+        end
+      end
+    CRYSTAL
+
+    query = build_lightweight_query(isa_source)
+    isa_lines = isa_source.lines(chomp: false)
+    isa_line_number = isa_lines.index! { |item| item.includes?("candidate.sh") }
+    isa_context = Crystalline::CompletionContext.detect(isa_lines[isa_line_number], isa_lines[isa_line_number].size - 1, nil)
+    isa_items = Crystalline::Lightweight::Completion.complete(isa_source, isa_line_number, isa_context.not_nil!, query).not_nil!
+    isa_items.map(&.insert_text).compact.should contain("shout")
+
+    truthy_source = <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+      end
+
+      def demo(candidate : Greeter | Nil)
+        if candidate
+          candidate.sh
+        end
+      end
+    CRYSTAL
+
+    truthy_query = build_lightweight_query(truthy_source)
+    truthy_lines = truthy_source.lines(chomp: false)
+    truthy_line_number = truthy_lines.index! { |item| item.includes?("candidate.sh") }
+    truthy_context = Crystalline::CompletionContext.detect(truthy_lines[truthy_line_number], truthy_lines[truthy_line_number].size - 1, nil)
+    truthy_items = Crystalline::Lightweight::Completion.complete(truthy_source, truthy_line_number, truthy_context.not_nil!, truthy_query).not_nil!
+    truthy_items.map(&.insert_text).compact.should contain("shout")
+  end
 end

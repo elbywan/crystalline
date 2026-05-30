@@ -80,11 +80,11 @@ module Crystalline::Lightweight
       when Crystal::If
         return unless !apply_cursor_bounds || starts_before_or_at_cursor?(node)
 
-        process_conditional(node.then, node.else, apply_cursor_bounds: apply_cursor_bounds)
+        process_if(node, apply_cursor_bounds: apply_cursor_bounds)
       when Crystal::Unless
         return unless !apply_cursor_bounds || starts_before_or_at_cursor?(node)
 
-        process_conditional(node.then, node.else, apply_cursor_bounds: apply_cursor_bounds)
+        process_unless(node, apply_cursor_bounds: apply_cursor_bounds)
       else
         return unless !apply_cursor_bounds || before_cursor?(node)
       end
@@ -219,28 +219,160 @@ module Crystalline::Lightweight
       found
     end
 
-    private def process_conditional(then_branch : Crystal::ASTNode, else_branch : Crystal::ASTNode, *, apply_cursor_bounds : Bool)
-      base_local_types = @local_types.dup
-      base_instance_var_types = @instance_var_types.dup
-      base_class_var_types = @class_var_types.dup
+    private def process_if(node : Crystal::If, *, apply_cursor_bounds : Bool)
+      if apply_cursor_bounds
+        if contains_cursor?(node.then)
+          apply_condition_refinement(node.cond, truthy: true)
+          process_node(node.then, apply_cursor_bounds: true)
+          return
+        elsif contains_cursor?(node.else)
+          apply_condition_refinement(node.cond, truthy: false)
+          process_node(node.else, apply_cursor_bounds: true)
+          return
+        end
+      end
 
+      process_conditional(node.cond, node.then, node.else, then_truthy: true, else_truthy: false, apply_cursor_bounds: apply_cursor_bounds)
+    end
+
+    private def process_unless(node : Crystal::Unless, *, apply_cursor_bounds : Bool)
+      if apply_cursor_bounds
+        if contains_cursor?(node.then)
+          apply_condition_refinement(node.cond, truthy: false)
+          process_node(node.then, apply_cursor_bounds: true)
+          return
+        elsif contains_cursor?(node.else)
+          apply_condition_refinement(node.cond, truthy: true)
+          process_node(node.else, apply_cursor_bounds: true)
+          return
+        end
+      end
+
+      process_conditional(node.cond, node.then, node.else, then_truthy: false, else_truthy: true, apply_cursor_bounds: apply_cursor_bounds)
+    end
+
+    private def process_conditional(cond : Crystal::ASTNode, then_branch : Crystal::ASTNode, else_branch : Crystal::ASTNode, *, then_truthy : Bool, else_truthy : Bool, apply_cursor_bounds : Bool)
+      base_state = current_state
+
+      restore_state(base_state)
+      apply_condition_refinement(cond, truthy: then_truthy)
       process_node(then_branch, apply_cursor_bounds: apply_cursor_bounds)
-      then_local_types = @local_types.dup
-      then_instance_var_types = @instance_var_types.dup
-      then_class_var_types = @class_var_types.dup
+      then_state = current_state
 
-      @local_types = base_local_types.dup
-      @instance_var_types = base_instance_var_types.dup
-      @class_var_types = base_class_var_types.dup
-
+      restore_state(base_state)
+      apply_condition_refinement(cond, truthy: else_truthy)
       process_node(else_branch, apply_cursor_bounds: apply_cursor_bounds)
-      else_local_types = @local_types.dup
-      else_instance_var_types = @instance_var_types.dup
-      else_class_var_types = @class_var_types.dup
+      else_state = current_state
 
-      @local_types = merge_branch_types(base_local_types, then_local_types, else_local_types)
-      @instance_var_types = merge_branch_types(base_instance_var_types, then_instance_var_types, else_instance_var_types)
-      @class_var_types = merge_branch_types(base_class_var_types, then_class_var_types, else_class_var_types)
+      restore_state(base_state)
+      @local_types = merge_branch_types(base_state[0], then_state[0], else_state[0])
+      @instance_var_types = merge_branch_types(base_state[1], then_state[1], else_state[1])
+      @class_var_types = merge_branch_types(base_state[2], then_state[2], else_state[2])
+    end
+
+    private def current_state
+      {@local_types.dup, @instance_var_types.dup, @class_var_types.dup}
+    end
+
+    private def restore_state(state)
+      @local_types = state[0].dup
+      @instance_var_types = state[1].dup
+      @class_var_types = state[2].dup
+    end
+
+    private def apply_condition_refinement(node : Crystal::ASTNode, *, truthy : Bool)
+      case node
+      when Crystal::Not
+        apply_condition_refinement(node.exp, truthy: !truthy)
+      when Crystal::And
+        if truthy
+          apply_condition_refinement(node.left, truthy: true)
+          apply_condition_refinement(node.right, truthy: true)
+        end
+      when Crystal::Or
+        unless truthy
+          apply_condition_refinement(node.left, truthy: false)
+          apply_condition_refinement(node.right, truthy: false)
+        end
+      when Crystal::IsA
+        refine_is_a(node, truthy: truthy)
+      when Crystal::Call
+        if node.name == "nil?" && node.args.empty?
+          refine_nil_check(node.obj, truthy: truthy)
+        end
+      when Crystal::Var, Crystal::InstanceVar, Crystal::ClassVar
+        refine_truthiness(node, truthy: truthy)
+      end
+    end
+
+    private def refine_is_a(node : Crystal::IsA, *, truthy : Bool)
+      target_type_names = expand_type_names(node.const.to_s)
+      return if target_type_names.empty?
+
+      if truthy
+        set_reference_types(node.obj, target_type_names)
+      else
+        remove_reference_types(node.obj, target_type_names)
+      end
+    end
+
+    private def refine_nil_check(node : Crystal::ASTNode?, *, truthy : Bool)
+      return unless node
+
+      if truthy
+        set_reference_types(node, ["Nil"])
+      else
+        remove_reference_types(node, ["Nil"])
+      end
+    end
+
+    private def refine_truthiness(node : Crystal::ASTNode, *, truthy : Bool)
+      if truthy
+        remove_reference_types(node, ["Nil"])
+      else
+        set_reference_types(node, ["Nil"])
+      end
+    end
+
+    private def reference_types(node : Crystal::ASTNode) : Array(String)?
+      case node
+      when Crystal::Var
+        node.name == "self" ? self_types[0] : @local_types[node.name]?
+      when Crystal::InstanceVar
+        @instance_var_types[node.name]?
+      when Crystal::ClassVar
+        @class_var_types[node.name]?
+      when Crystal::Self
+        self_types[0]
+      end
+    end
+
+    private def set_reference_types(node : Crystal::ASTNode, type_names : Array(String))
+      normalized = type_names.uniq
+      return if normalized.empty?
+
+      case node
+      when Crystal::Var
+        @local_types[node.name] = normalized unless node.name == "self"
+      when Crystal::InstanceVar
+        @instance_var_types[node.name] = normalized
+      when Crystal::ClassVar
+        @class_var_types[node.name] = normalized
+      end
+    end
+
+    private def remove_reference_types(node : Crystal::ASTNode, excluded_type_names : Array(String))
+      current_types = reference_types(node)
+      return unless current_types
+
+      remaining_types = current_types.reject { |type_name| excluded_type_names.includes?(type_name) }
+      return if remaining_types == current_types
+
+      if remaining_types.empty?
+        remaining_types = excluded_type_names.includes?("Nil") ? current_types.reject(&.==("Nil")) : current_types
+      end
+
+      set_reference_types(node, remaining_types)
     end
 
     private def merge_branch_types(base : Hash(String, Array(String)), left : Hash(String, Array(String)), right : Hash(String, Array(String)))

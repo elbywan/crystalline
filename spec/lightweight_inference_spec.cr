@@ -178,4 +178,56 @@ describe Crystalline::Lightweight::Inference do
     inference.types_for("value").sort.should eq(["Bar", "Foo", "Nil"])
     inference.types_for("result").sort.should eq(["Bar", "Foo", "Nil"])
   end
+
+  it "narrows types inside is_a? and truthy conditional branches" do
+    index = build_lightweight_index <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+      end
+    CRYSTAL
+
+    isa_source = <<-CRYSTAL
+      def demo(candidate : Greeter | Nil | Int32)
+        if candidate.is_a?(Greeter)
+          narrowed = candidate
+          narrowed
+        end
+      end
+    CRYSTAL
+
+    narrowed_inference = Crystalline::Lightweight::Inference.for(
+      isa_source,
+      4,
+      10,
+      Crystalline::Lightweight::Query.new(index),
+    )
+
+    narrowed_inference.should_not be_nil
+    narrowed_inference = narrowed_inference.not_nil!
+    narrowed_inference.types_for("candidate").should eq(["Greeter"])
+    narrowed_inference.types_for("narrowed").should eq(["Greeter"])
+
+    truthy_source = <<-CRYSTAL
+      def demo(candidate : Greeter | Nil)
+        if candidate
+          truthy_candidate = candidate
+          truthy_candidate
+        end
+      end
+    CRYSTAL
+
+    truthy_inference = Crystalline::Lightweight::Inference.for(
+      truthy_source,
+      4,
+      12,
+      Crystalline::Lightweight::Query.new(index),
+    )
+
+    truthy_inference.should_not be_nil
+    truthy_inference = truthy_inference.not_nil!
+    truthy_inference.types_for("candidate").should eq(["Greeter"])
+    truthy_inference.types_for("truthy_candidate").should eq(["Greeter"])
+  end
 end
