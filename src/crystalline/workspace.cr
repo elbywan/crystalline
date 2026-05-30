@@ -4,6 +4,7 @@ require "./text_document"
 require "./progress"
 require "./project"
 require "./result_cache"
+require "./lightweight_completion"
 require "./analysis/*"
 
 class Crystalline::Workspace
@@ -386,6 +387,12 @@ class Crystalline::Workspace
 
     trigger_character = completion_context.trigger_character
 
+    if (query = text_document.project?.try &.lightweight_query)
+      if completion_items = Crystalline::Lightweight::Completion.complete(document_lines.join, position.line, completion_context, query)
+        return build_completion_list(completion_items) unless completion_items.empty?
+      end
+    end
+
     location = Crystal::Location.new(
       file_uri.decoded_path,
       line_number: position.line + 1,
@@ -548,29 +555,33 @@ class Crystalline::Workspace
         }
       end
 
-      selected_element_index = nil
-      completion_items.each_with_index do |elt, i|
-        sort_text = elt.sort_text || elt.label
-        selected_element_index ||= i
-        target = completion_items[selected_element_index].try { |e| e.sort_text || e.label }
-        if (sort_text <=> target) < 0
-          selected_element_index = i
-        end
-      end
-
-      if selected_element_index
-        selected_element = completion_items[selected_element_index]
-        selected_element.preselect = true
-        completion_items[selected_element_index] = selected_element
-      end
-
-      LSP::CompletionList.new(
-        is_incomplete: false,
-        items: completion_items,
-      )
+      build_completion_list(completion_items)
     end
   rescue
     nil
+  end
+
+  private def build_completion_list(completion_items : Array(LSP::CompletionItem)) : LSP::CompletionList
+    selected_element_index = nil
+    completion_items.each_with_index do |elt, i|
+      sort_text = elt.sort_text || elt.label
+      selected_element_index ||= i
+      target = completion_items[selected_element_index].try { |e| e.sort_text || e.label }
+      if (sort_text <=> target) < 0
+        selected_element_index = i
+      end
+    end
+
+    if selected_element_index
+      selected_element = completion_items[selected_element_index]
+      selected_element.preselect = true
+      completion_items[selected_element_index] = selected_element
+    end
+
+    LSP::CompletionList.new(
+      is_incomplete: false,
+      items: completion_items,
+    )
   end
 
   def document_symbols(server : LSP::Server, file_uri : URI)
