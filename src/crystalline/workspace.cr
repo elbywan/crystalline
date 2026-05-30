@@ -259,12 +259,18 @@ class Crystalline::Workspace
   def hover(server : LSP::Server, file_uri : URI, position : LSP::Position)
     if (text_document = @opened_documents[file_uri.to_s]?) && (query = text_document.project?.try &.lightweight_query)
       if hover = Crystalline::Lightweight::Hover.hover(fix_source(text_document.contents), position.line, position.character, query)
+        LSP::Log.info { "[hover] lightweight hit: #{file_uri.decoded_path}:#{position.line}:#{position.character}" }
         return hover
       end
     end
 
     result = @semantic_cache[semantic_cache_key(file_uri)]?
-    return unless result
+    unless result
+      LSP::Log.info { "[hover] bail without compile: #{file_uri.decoded_path}:#{position.line}:#{position.character}" }
+      return
+    end
+
+    LSP::Log.info { "[hover] semantic cache hit: #{file_uri.decoded_path}:#{position.line}:#{position.character}" }
     location = Crystal::Location.new(
       file_uri.decoded_path,
       line_number: position.line + 1,
@@ -398,7 +404,10 @@ class Crystalline::Workspace
 
     if (query = text_document.project?.try &.lightweight_query)
       if completion_items = Crystalline::Lightweight::Completion.complete(document_lines.join, position.line, completion_context, query)
-        return build_completion_list(completion_items) unless completion_items.empty?
+        unless completion_items.empty?
+          LSP::Log.info { "[completion] lightweight hit: #{file_uri.decoded_path}:#{position.line}:#{position.character}" }
+          return build_completion_list(completion_items)
+        end
       end
     end
 
@@ -409,7 +418,12 @@ class Crystalline::Workspace
     )
 
     result = @semantic_cache[semantic_cache_key(file_uri)]?
-    return unless result
+    unless result
+      LSP::Log.info { "[completion] bail without compile: #{file_uri.decoded_path}:#{position.line}:#{position.character}" }
+      return
+    end
+
+    LSP::Log.info { "[completion] semantic cache hit: #{file_uri.decoded_path}:#{position.line}:#{position.character}" }
 
     nodes, _ = Analysis.nodes_at_cursor(result, location)
     nodes.last?.try do |n|
