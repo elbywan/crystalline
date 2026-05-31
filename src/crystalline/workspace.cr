@@ -6,6 +6,7 @@ require "./project"
 require "./result_cache"
 require "./lightweight/completion"
 require "./lightweight/hover"
+require "./lightweight/definitions"
 require "./analysis/*"
 
 class Crystalline::Workspace
@@ -251,7 +252,7 @@ class Crystalline::Workspace
 
   private def lightweight_query_for(file_uri : URI, source : String) : Crystalline::Lightweight::Query?
     if project = project_for_file(file_uri)
-      project.lightweight_query
+      project.lightweight_query || Crystalline::Lightweight::Index.from_source(source).try { |index| Crystalline::Lightweight::Query.new(index) }
     else
       Crystalline::Lightweight::Index.from_source(source).try { |index| Crystalline::Lightweight::Query.new(index) }
     end
@@ -388,6 +389,14 @@ class Crystalline::Workspace
   end
 
   def definitions(server : LSP::Server, file_uri : URI, position : LSP::Position)
+    if text_document = @opened_documents[file_uri.to_s]?
+      source = fix_source(text_document.contents)
+      if locations = Crystalline::Lightweight::Definitions.definitions(source, file_uri, position.line, position.character, lightweight_query_for(file_uri, source))
+        LSP::Log.info { "[definitions] lightweight hit: #{file_uri.decoded_path}:#{position.line}:#{position.character}" }
+        return locations
+      end
+    end
+
     unless semantic_cache_allowed?(file_uri)
       LSP::Log.info { "[definitions] bail on dirty buffer: #{file_uri.decoded_path}:#{position.line}:#{position.character}" }
       return

@@ -92,7 +92,7 @@ describe Crystalline::Workspace do
     end
   end
 
-  it "does not compile definition requests without a semantic cache" do
+  it "uses lightweight definitions without a semantic cache" do
     source = <<-CRYSTAL
       class Greeter
         def shout : String
@@ -111,7 +111,9 @@ describe Crystalline::Workspace do
       character = lines[line_number].rindex("shout").not_nil! + 2
       position = LSP::Position.new(line: line_number, character: character)
 
-      workspace.definitions(server, uri, position).should be_nil
+      definitions = workspace.definitions(server, uri, position)
+      definitions.should_not be_nil
+      definitions.not_nil!.size.should be > 0
     end
   end
 
