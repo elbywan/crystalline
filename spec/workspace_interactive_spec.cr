@@ -34,6 +34,10 @@ class Crystalline::Workspace
   end
 end
 
+private def mark_workspace_document_dirty(document : Crystalline::TextDocument, contents : String, version : Int32 = 1)
+  document.update_contents([{contents, nil}], version: version)
+end
+
 describe Crystalline::Workspace do
   it "does not compile unsupported completion requests without a semantic cache" do
     source = <<-CRYSTAL
@@ -154,6 +158,99 @@ describe Crystalline::Workspace do
       workspace.hover(server, uri, position).should be_nil
       workspace.completion(server, uri, position, nil).should be_nil
       workspace.definitions(server, uri, position).should be_nil
+    end
+  end
+
+  it "uses summary-backed lightweight hover on dirty generic receiver chains" do
+    source = <<-CRYSTAL
+      def demo
+        reply_channel = Channel(String).new
+        reply_channel.receive.upcase
+      end
+    CRYSTAL
+
+    with_workspace_document(source) do |server, workspace, uri|
+      project = workspace.projects.first?.not_nil!
+      workspace.recalculate_dependencies(server, project)
+      result = Crystalline::Analysis.compile(
+        server,
+        uri,
+        lib_path: project.default_lib_path,
+        ignore_diagnostics: true,
+        wants_doc: true,
+        compiler_flags: project.flags,
+      )
+      result.should_not be_nil
+      project.semantic_summary = Crystalline::Lightweight::Summary.from_result(result.not_nil!)
+
+      mark_workspace_document_dirty(workspace.opened_documents[uri.to_s].not_nil!, source)
+
+      lines = source.lines(chomp: false)
+      line_number = lines.index! { |line| line.includes?("reply_channel.receive.upcase") }
+      character = lines[line_number].rindex("upcase").not_nil! + 2
+      position = LSP::Position.new(line: line_number, character: character)
+
+      hover = workspace.hover(server, uri, position)
+      hover.should_not be_nil
+      hover.not_nil!.contents.as(LSP::MarkupContent).value.should contain("String#upcase")
+    end
+  end
+
+  it "uses current-source lightweight overlays for dirty file method hovers" do
+    source = <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+      end
+
+      def demo
+        greeter = Greeter.new
+        greeter.shout
+      end
+    CRYSTAL
+
+    dirty_source = <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+
+        def whisper : String
+          "."
+        end
+      end
+
+      def demo
+        greeter = Greeter.new
+        greeter.whisper
+      end
+    CRYSTAL
+
+    with_workspace_document(source) do |server, workspace, uri|
+      project = workspace.projects.first?.not_nil!
+      workspace.recalculate_dependencies(server, project)
+      result = Crystalline::Analysis.compile(
+        server,
+        uri,
+        lib_path: project.default_lib_path,
+        ignore_diagnostics: true,
+        wants_doc: true,
+        compiler_flags: project.flags,
+      )
+      result.should_not be_nil
+      project.semantic_summary = Crystalline::Lightweight::Summary.from_result(result.not_nil!)
+
+      mark_workspace_document_dirty(workspace.opened_documents[uri.to_s].not_nil!, dirty_source)
+
+      lines = dirty_source.lines(chomp: false)
+      line_number = lines.index! { |line| line.includes?("greeter.whisper") }
+      character = lines[line_number].rindex("whisper").not_nil! + 2
+      position = LSP::Position.new(line: line_number, character: character)
+
+      hover = workspace.hover(server, uri, position)
+      hover.should_not be_nil
+      hover.not_nil!.contents.as(LSP::MarkupContent).value.should contain("Greeter#whisper() : String")
     end
   end
 end

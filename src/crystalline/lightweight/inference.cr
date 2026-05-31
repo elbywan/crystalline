@@ -109,7 +109,7 @@ module Crystalline::Lightweight
         types_for_class_var(node.name)
       when Crystal::Self
         self_types[0]
-      when Crystal::Path
+      when Crystal::Path, Crystal::Generic
         @query.find_type(node.to_s) ? [node.to_s] : [] of String
       when Crystal::NilLiteral
         ["Nil"]
@@ -308,8 +308,7 @@ module Crystalline::Lightweight
     private def infer_call_types(node : Crystal::Call) : Array(String)
       if node.name == "new"
         if object = node.obj
-          if path = object.as?(Crystal::Path)
-            type_name = path.to_s
+          if type_name = type_expression_name(object)
             return [type_name] if @query.find_type(type_name)
           end
         end
@@ -340,6 +339,15 @@ module Crystalline::Lightweight
       end
 
       return_types.uniq
+    end
+
+    private def type_expression_name(node : Crystal::ASTNode) : String?
+      case node
+      when Crystal::Path, Crystal::Generic
+        node.to_s
+      else
+        nil
+      end
     end
 
     private def infer_special_call_types(node : Crystal::Call, object_types : Array(String)) : Array(String)

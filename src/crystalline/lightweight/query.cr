@@ -7,19 +7,30 @@ module Crystalline::Lightweight
     end
 
     def find_type(name : String) : TypeInfo?
-      @index.types[name]?
+      @index.types[name]? || generic_specialization_for(name).try(&.[0])
     end
 
     def methods_for(type_name : String, *, class_method = false, include_macros = false) : Array(MethodInfo)
       methods = [] of MethodInfo
 
-      if type = find_type(type_name)
+      if type = @index.types[type_name]?
+        methods.concat(type.methods.select do |method|
+          method.class_method == class_method && (include_macros || !method.macro)
+        end)
+      elsif specialization = generic_specialization_for(type_name)
+        generic_type, mapping = specialization
+        methods.concat(generic_type.methods.select { |method|
+          method.class_method == class_method && (include_macros || !method.macro)
+        }.map { |method|
+          specialize_method(method, owner_name: type_name, mapping: mapping)
+        })
+      elsif type = find_type(type_name)
         methods.concat(type.methods.select do |method|
           method.class_method == class_method && (include_macros || !method.macro)
         end)
       end
 
-      if summary_type = @summary.try &.type(type_name)
+      summary_types_for(type_name).each do |summary_type|
         methods = merge_methods(methods, summary_type.methods.select(&.class_method.==(class_method)))
       end
 
@@ -39,7 +50,13 @@ module Crystalline::Lightweight
     end
 
     def method_contracts_for(type_name : String, method_name : String, *, class_method = false) : Array(MethodContract)
-      contracts = @summary.try(&.type(type_name)).try(&.method_contracts[method_name]?).try(&.select(&.class_method.==(class_method))).try(&.dup) || [] of MethodContract
+      contracts = [] of MethodContract
+      summary_types_for(type_name).each do |summary_type|
+        summary_type.method_contracts[method_name]?.try(&.each do |contract|
+          next unless contract.class_method == class_method
+          contracts << contract unless contracts.includes?(contract)
+        end)
+      end
 
       methods_for(type_name, class_method: class_method).select(&.name.==(method_name)).each do |method|
         infer_contracts(type_name, method).each do |contract|
@@ -51,19 +68,115 @@ module Crystalline::Lightweight
     end
 
     def instance_var_types_for(type_name : String, var_name : String) : Array(String)
-      @summary.try(&.type(type_name)).try(&.instance_vars[var_name]?) || [] of String
+      summary_types_for(type_name).each do |summary_type|
+        if types = summary_type.instance_vars[var_name]?
+          return types
+        end
+      end
+      [] of String
     end
 
     def class_var_types_for(type_name : String, var_name : String) : Array(String)
-      @summary.try(&.type(type_name)).try(&.class_vars[var_name]?) || [] of String
+      summary_types_for(type_name).each do |summary_type|
+        if types = summary_type.class_vars[var_name]?
+          return types
+        end
+      end
+      [] of String
     end
 
     def instance_vars_for(type_name : String) : Hash(String, Array(String))
-      @summary.try(&.type(type_name)).try(&.instance_vars.transform_values(&.dup)) || {} of String => Array(String)
+      summary_types_for(type_name).each do |summary_type|
+        return summary_type.instance_vars.transform_values(&.dup) if summary_type.instance_vars.any?
+      end
+      {} of String => Array(String)
     end
 
     def class_vars_for(type_name : String) : Hash(String, Array(String))
-      @summary.try(&.type(type_name)).try(&.class_vars.transform_values(&.dup)) || {} of String => Array(String)
+      summary_types_for(type_name).each do |summary_type|
+        return summary_type.class_vars.transform_values(&.dup) if summary_type.class_vars.any?
+      end
+      {} of String => Array(String)
+    end
+
+    private def summary_types_for(type_name : String) : Array(SummaryType)
+      types = [] of SummaryType
+      if summary_type = @summary.try(&.type(type_name))
+        types << summary_type
+      end
+
+      if specialization = generic_summary_specialization_for(type_name)
+        summary_type, _ = specialization
+        types << summary_type unless types.includes?(summary_type)
+      end
+
+      types
+    end
+
+    private def generic_specialization_for(type_name : String) : {TypeInfo, Hash(String, String)}?
+      generic_specialization(type_name) do |candidate_name|
+        @index.types[candidate_name]?
+      end
+    end
+
+    private def generic_summary_specialization_for(type_name : String) : {SummaryType, Hash(String, String)}?
+      generic_specialization(type_name) do |candidate_name|
+        @summary.try(&.type(candidate_name))
+      end
+    end
+
+    private def generic_specialization(type_name : String, &resolver : String -> T?) forall T
+      normalized = type_name.strip
+      return unless open_index = normalized.index('(')
+      return unless normalized.ends_with?(')')
+
+      base_name = normalized[0, open_index]
+      actual_args = split_top_level(normalized[open_index + 1...-1])
+
+      generic_candidate_names(base_name).each do |candidate_name|
+        candidate_params = split_top_level(candidate_name[base_name.size + 1...-1])
+        next unless candidate_params.size == actual_args.size
+
+        if candidate = yield candidate_name
+          mapping = {} of String => String
+          candidate_params.each_with_index do |param, index|
+            mapping[param] = actual_args[index]
+          end
+          return {candidate, mapping}
+        end
+      end
+
+      nil
+    end
+
+    private def generic_candidate_names(base_name : String) : Array(String)
+      candidates = @index.types.keys.select { |name| name.starts_with?("#{base_name}(") }
+      if summary = @summary
+        candidates.concat(summary.types.keys.select { |name| name.starts_with?("#{base_name}(") })
+      end
+      candidates.uniq
+    end
+
+    private def specialize_method(method : MethodInfo, owner_name : String, mapping : Hash(String, String)) : MethodInfo
+      MethodInfo.new(
+        name: method.name,
+        owner: owner_name,
+        args: method.args.map { |arg|
+          ArgInfo.new(name: arg.name, restriction: substitute_type_vars(arg.restriction, mapping))
+        },
+        return_type: substitute_type_vars(method.return_type, mapping),
+        class_method: method.class_method,
+        macro: method.macro,
+        doc: method.doc,
+      )
+    end
+
+    private def substitute_type_vars(type_name : String?, mapping : Hash(String, String)) : String?
+      return unless type_name
+
+      mapping.reduce(type_name) do |value, (param, replacement)|
+        value.gsub(/\b#{Regex.escape(param)}\b/, replacement)
+      end
     end
 
     private def infer_contracts(owner_name : String, method : MethodInfo) : Array(MethodContract)

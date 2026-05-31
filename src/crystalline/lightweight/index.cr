@@ -38,6 +38,13 @@ module Crystalline::Lightweight
     getter types = {} of String => TypeInfo
     getter top_level_methods = [] of MethodInfo
 
+    def merge(other : Index) : Index
+      merged = Index.new
+      copy_into(merged, self)
+      copy_into(merged, other)
+      merged
+    end
+
     def self.from_program(program : Crystal::Program) : self
       new.tap do |index|
         program.types.each_value do |type|
@@ -64,6 +71,38 @@ module Crystalline::Lightweight
       end
     rescue Crystal::SyntaxException
       nil
+    end
+
+    protected def copy_into(target : Index, source : Index)
+      source.types.each_value do |type|
+        target_type = target.types[type.name]?
+        unless target_type
+          target_type = TypeInfo.new(type.name, type.kind, type.doc)
+          target.types[type.name] = target_type
+        end
+
+        type.methods.each do |method|
+          next if target_type.methods.any? { |existing| same_method?(existing, method) }
+          target_type.methods << method
+        end
+
+        type.subtypes.each do |subtype|
+          target_type.subtypes << subtype unless target_type.subtypes.includes?(subtype)
+        end
+      end
+
+      source.top_level_methods.each do |method|
+        next if target.top_level_methods.any? { |existing| same_method?(existing, method) }
+        target.top_level_methods << method
+      end
+    end
+
+    protected def same_method?(left : MethodInfo, right : MethodInfo) : Bool
+      left.name == right.name &&
+        left.owner == right.owner &&
+        left.class_method == right.class_method &&
+        left.macro == right.macro &&
+        left.args.map(&.restriction) == right.args.map(&.restriction)
     end
 
     protected def index_syntax_node(node : Crystal::ASTNode, namespace : String? = nil)

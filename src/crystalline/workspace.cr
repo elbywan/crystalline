@@ -251,11 +251,16 @@ class Crystalline::Workspace
   end
 
   private def lightweight_query_for(file_uri : URI, source : String) : Crystalline::Lightweight::Query?
+    source_index = Crystalline::Lightweight::Index.from_source(source)
+
     if project = project_for_file(file_uri)
-      project.lightweight_query || Crystalline::Lightweight::Index.from_source(source).try { |index| Crystalline::Lightweight::Query.new(index) }
-    else
-      Crystalline::Lightweight::Index.from_source(source).try { |index| Crystalline::Lightweight::Query.new(index) }
+      if project_index = project.lightweight_index
+        merged_index = source_index ? project_index.merge(source_index) : project_index
+        return Crystalline::Lightweight::Query.new(merged_index, project.semantic_summary)
+      end
     end
+
+    source_index.try { |index| Crystalline::Lightweight::Query.new(index) }
   end
 
   private def semantic_cache_key(file_uri : URI) : String
