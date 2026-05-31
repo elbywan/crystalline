@@ -316,6 +316,9 @@ describe Crystalline::Lightweight::Hover do
         pair = {Greeter.new, 1}
         pair.first.shout
 
+        tuple_pair = {1, "x"}
+        tuple_pair.map
+
         named = {greeter: Greeter.new}
         named.greeter.shout
       end
@@ -329,6 +332,12 @@ describe Crystalline::Lightweight::Hover do
     tuple_hover = Crystalline::Lightweight::Hover.hover(source, tuple_line_number, tuple_column_number, query)
     tuple_hover.should_not be_nil
     hover_value(tuple_hover.not_nil!).should contain("Greeter#shout() : String")
+
+    tuple_map_line_number = lines.index! { |item| item.strip == "tuple_pair.map" }
+    tuple_map_column_number = lines[tuple_map_line_number].rindex("map").not_nil! + 2
+    tuple_map_hover = Crystalline::Lightweight::Hover.hover(source, tuple_map_line_number, tuple_map_column_number, query)
+    tuple_map_hover.should_not be_nil
+    hover_value(tuple_map_hover.not_nil!).should contain("Tuple(Int32, String)#map()")
 
     named_line_number = lines.index! { |item| item.strip == "named.greeter.shout" }
     named_column_number = lines[named_line_number].rindex("shout").not_nil! + 2

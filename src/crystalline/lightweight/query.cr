@@ -194,18 +194,34 @@ module Crystalline::Lightweight
 
       generic_candidate_names(base_name).each do |candidate_name|
         candidate_params = split_top_level(candidate_name[base_name.size + 1...-1])
-        next unless candidate_params.size == actual_args.size
+        mapping = build_generic_mapping(candidate_params, actual_args)
+        next unless mapping
 
         if candidate = yield candidate_name
-          mapping = {} of String => String
-          candidate_params.each_with_index do |param, index|
-            mapping[param] = actual_args[index]
-          end
           return {candidate, mapping}
         end
       end
 
       nil
+    end
+
+    private def build_generic_mapping(candidate_params : Array(String), actual_args : Array(String)) : Hash(String, String)?
+      if candidate_params.size == actual_args.size
+        mapping = {} of String => String
+        candidate_params.each_with_index do |param, index|
+          mapping[param] = actual_args[index]
+        end
+        return mapping
+      end
+
+      return unless candidate_params.size == 1
+      splat_param = candidate_params.first
+      return unless splat_param.starts_with?('*')
+
+      union_value = actual_args.join(" | ")
+      {
+        splat_param => union_value,
+      }
     end
 
     private def generic_candidate_names(base_name : String) : Array(String)

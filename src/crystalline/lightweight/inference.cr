@@ -155,7 +155,14 @@ module Crystalline::Lightweight
       when Crystal::And
         infer_and_types(node)
       when Crystal::TupleLiteral
-        ["Tuple(#{join_union_types(node.elements.flat_map { |element| infer_types(element) })})"]
+        tuple_part_types = node.elements.map do |element|
+          element_types = infer_types(element)
+          next nil if element_types.empty?
+          join_union_types(element_types)
+        end
+        return ["Tuple"] if tuple_part_types.any?(&.nil?)
+
+        ["Tuple(#{tuple_part_types.compact.join(", ")})"]
       else
         [] of String
       end

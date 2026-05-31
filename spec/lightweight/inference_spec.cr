@@ -259,6 +259,31 @@ describe Crystalline::Lightweight::Inference do
     inference.types_for("resolved").should eq(["Greeter"])
   end
 
+  it "preserves tuple literal element shapes for generic specialization" do
+    index = build_lightweight_index <<-CRYSTAL
+      def noop
+      end
+    CRYSTAL
+
+    source = <<-CRYSTAL
+      def demo
+        pair = {1, "x"}
+        pair
+      end
+    CRYSTAL
+
+    inference = Crystalline::Lightweight::Inference.for(
+      source,
+      3,
+      6,
+      Crystalline::Lightweight::Query.new(index),
+    )
+
+    inference.should_not be_nil
+    inference = inference.not_nil!
+    inference.types_for("pair").should eq(["Tuple(Int32, String)"])
+  end
+
   it "infers block args and container return types for richer collection helpers" do
     index = build_lightweight_index <<-CRYSTAL
       class Greeter
