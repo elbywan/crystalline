@@ -250,6 +250,11 @@ module Crystalline::Lightweight
         element_types = array_block_argument_types(object_types).first?
         return [] of Array(String) unless element_types
         [element_types, ["Int32"]]
+      when "each_with_object"
+        element_types = array_block_argument_types(object_types).first?
+        memo_types = node.args.first?.try { |arg| infer_types(arg) } || [] of String
+        return [] of Array(String) if element_types.nil? || memo_types.empty?
+        [element_types, memo_types]
       when "each_key"
         return hash_key_block_argument_types(object_types)
       when "each_value"
@@ -464,6 +469,8 @@ module Crystalline::Lightweight
         end
       when "tap", "each", "each_with_index"
         return object_types.uniq
+      when "each_with_object"
+        return node.args.first?.try { |arg| infer_types(arg) } || [] of String
       when "select", "reject"
         return object_types.uniq
       end
@@ -476,6 +483,14 @@ module Crystalline::Lightweight
     end
 
     private def infer_array_literal_types(node : Crystal::ArrayLiteral) : Array(String)
+      if node.elements.empty?
+        if of_type = node.of
+          resolved_types = resolve_type_names(of_type.to_s)
+          return ["Array(#{join_union_types(resolved_types)})"] unless resolved_types.empty?
+        end
+        return ["Array"]
+      end
+
       element_types = node.elements.flat_map { |element| infer_types(element) }.uniq
       return ["Array"] if element_types.empty?
 

@@ -311,6 +311,11 @@ describe Crystalline::Lightweight::Inference do
           item
         end
 
+        collected = lookup.values.each_with_object([] of String) do |item, memo|
+          item.word.not_nil!
+          memo.first?
+        end
+
         mapped = lookup.values.map { |item| item.word.not_nil! }
         flat_mapped = lookup.values.flat_map { |item| [item.word.not_nil!] }
         compacted = lookup.values.compact_map { |item| item.word }
@@ -353,6 +358,20 @@ describe Crystalline::Lightweight::Inference do
     reduce_inference.types_for("memo").should eq(["Int32"])
     reduce_inference.types_for("item").should eq(["Int32"])
 
+    each_with_object_line_number = lines.index! { |line| line.includes?("memo.first?") } + 1
+    each_with_object_column_number = lines[each_with_object_line_number - 1].index("memo").not_nil! + 2
+    each_with_object_inference = Crystalline::Lightweight::Inference.for(
+      source,
+      each_with_object_line_number,
+      each_with_object_column_number,
+      Crystalline::Lightweight::Query.new(index),
+    )
+
+    each_with_object_inference.should_not be_nil
+    each_with_object_inference = each_with_object_inference.not_nil!
+    each_with_object_inference.types_for("item").should eq(["Greeter"])
+    each_with_object_inference.types_for("memo").should eq(["Array(String)"])
+
     found_line_number = lines.index! { |line| line.strip == "found" } + 1
     found_column_number = lines[found_line_number - 1].index("found").not_nil! + 2
     return_inference = Crystalline::Lightweight::Inference.for(
@@ -364,6 +383,7 @@ describe Crystalline::Lightweight::Inference do
 
     return_inference.should_not be_nil
     return_inference = return_inference.not_nil!
+    return_inference.types_for("collected").should eq(["Array(String)"])
     return_inference.types_for("mapped").should eq(["Array(String)"])
     return_inference.types_for("flat_mapped").should eq(["Array(String)"])
     return_inference.types_for("compacted").should eq(["Array(String)"])

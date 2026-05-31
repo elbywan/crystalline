@@ -495,6 +495,12 @@ describe Crystalline::Lightweight::Completion do
           item.to_
         end
 
+        collected = lookup.values.each_with_object([] of String) do |collected_item, collected_memo|
+          collected_item.sh
+          collected_memo.fi
+        end
+        collected.first.up
+
         mapped = lookup.values.map { |item| item.word.not_nil! }
         mapped.first.up
 
@@ -537,6 +543,21 @@ describe Crystalline::Lightweight::Completion do
     item_context = Crystalline::CompletionContext.detect(lines[item_line_number], lines[item_line_number].size - 1, nil)
     item_items = Crystalline::Lightweight::Completion.complete(source, item_line_number, item_context.not_nil!, query).not_nil!
     item_items.map(&.insert_text).compact.should contain("to_i")
+
+    each_with_object_item_line_number = lines.index! { |item| item.includes?("collected_item.sh") }
+    each_with_object_item_context = Crystalline::CompletionContext.detect(lines[each_with_object_item_line_number], lines[each_with_object_item_line_number].size - 1, nil)
+    each_with_object_item_items = Crystalline::Lightweight::Completion.complete(source, each_with_object_item_line_number, each_with_object_item_context.not_nil!, query).not_nil!
+    each_with_object_item_items.map(&.insert_text).compact.should contain("shout")
+
+    each_with_object_memo_line_number = lines.index! { |item| item.includes?("collected_memo.fi") }
+    each_with_object_memo_context = Crystalline::CompletionContext.detect(lines[each_with_object_memo_line_number], lines[each_with_object_memo_line_number].size - 1, nil)
+    each_with_object_memo_items = Crystalline::Lightweight::Completion.complete(source, each_with_object_memo_line_number, each_with_object_memo_context.not_nil!, query).not_nil!
+    each_with_object_memo_items.map(&.insert_text).compact.should contain("first?")
+
+    collected_line_number = lines.index! { |item| item.includes?("collected.first.up") }
+    collected_context = Crystalline::CompletionContext.detect(lines[collected_line_number], lines[collected_line_number].size - 1, nil)
+    collected_items = Crystalline::Lightweight::Completion.complete(source, collected_line_number, collected_context.not_nil!, query).not_nil!
+    collected_items.map(&.insert_text).compact.should contain("upcase")
 
     mapped_line_number = lines.index! { |item| item.includes?("mapped.first.up") }
     mapped_context = Crystalline::CompletionContext.detect(lines[mapped_line_number], lines[mapped_line_number].size - 1, nil)

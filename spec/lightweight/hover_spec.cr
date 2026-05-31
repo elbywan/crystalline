@@ -408,6 +408,12 @@ describe Crystalline::Lightweight::Hover do
           item
         end
 
+        collected = lookup.values.each_with_object([] of String) do |collected_item, collected_memo|
+          collected_item
+          collected_memo
+        end
+        collected.first.upcase
+
         mapped = lookup.values.map { |item| item.word.not_nil! }
         mapped.first.upcase
 
@@ -454,6 +460,24 @@ describe Crystalline::Lightweight::Hover do
     item_hover = Crystalline::Lightweight::Hover.hover(source, item_line_number, item_column_number, query)
     item_hover.should_not be_nil
     hover_value(item_hover.not_nil!).should contain("item : Int32")
+
+    each_with_object_item_line_number = lines.index! { |item| item.strip == "collected_item" }
+    each_with_object_item_column_number = lines[each_with_object_item_line_number].index("collected_item").not_nil! + 1
+    each_with_object_item_hover = Crystalline::Lightweight::Hover.hover(source, each_with_object_item_line_number, each_with_object_item_column_number, query)
+    each_with_object_item_hover.should_not be_nil
+    hover_value(each_with_object_item_hover.not_nil!).should contain("collected_item : Greeter")
+
+    each_with_object_memo_line_number = lines.index! { |item| item.strip == "collected_memo" }
+    each_with_object_memo_column_number = lines[each_with_object_memo_line_number].index("collected_memo").not_nil! + 1
+    each_with_object_memo_hover = Crystalline::Lightweight::Hover.hover(source, each_with_object_memo_line_number, each_with_object_memo_column_number, query)
+    each_with_object_memo_hover.should_not be_nil
+    hover_value(each_with_object_memo_hover.not_nil!).should contain("collected_memo : Array(String)")
+
+    collected_line_number = lines.index! { |item| item.strip == "collected.first.upcase" }
+    collected_column_number = lines[collected_line_number].rindex("upcase").not_nil! + 2
+    collected_hover = Crystalline::Lightweight::Hover.hover(source, collected_line_number, collected_column_number, query)
+    collected_hover.should_not be_nil
+    hover_value(collected_hover.not_nil!).should contain("String#upcase(")
 
     mapped_line_number = lines.index! { |item| item.strip == "mapped.first.upcase" }
     mapped_column_number = lines[mapped_line_number].rindex("upcase").not_nil! + 2
