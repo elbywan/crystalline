@@ -22,6 +22,7 @@ class Crystalline::Controller
     spawn same_thread: true do
       workspace.projects.each do |p|
         if (entry_point = p.entry_point?)
+          LSP::Log.info { "[compile] startup: #{entry_point.decoded_path}" }
           workspace.compile(@server, entry_point)
         end
       end
@@ -124,9 +125,11 @@ class Crystalline::Controller
       file_uri = message.params.text_document.uri
       spawn do
         @compiler_lock.synchronize {
+          parsed_uri = URI.parse(file_uri)
+          LSP::Log.info { "[compile] save: #{parsed_uri.decoded_path}" }
           workspace.compile(
             @server,
-            URI.parse(file_uri),
+            parsed_uri,
             discard_nil_cached_result: true,
           )
         }

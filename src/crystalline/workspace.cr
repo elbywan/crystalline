@@ -94,6 +94,7 @@ class Crystalline::Workspace
   def recalculate_dependencies(server, project)
     return unless (target = project.entry_point?)
 
+    LSP::Log.info { "[compile] dependency recalculation: #{target.decoded_path}" }
     lib_path = project.default_lib_path
     Analysis.compile(server, target, lib_path: lib_path, ignore_diagnostics: true, wants_doc: false, top_level: true, compiler_flags: project.flags).try { |result|
       project.dependencies = result.program.requires
@@ -150,9 +151,20 @@ class Crystalline::Workspace
     end
 
     target_string = target.to_s
+    LSP::Log.info do
+      source_kind = if in_memory
+        "in-memory"
+      elsif top_level
+        "top-level"
+      else
+        "filesystem"
+      end
+      "[compile] request: target=#{target.decoded_path} source=#{source_kind} ignore_cached=#{ignore_cached_result} discard_nil_cached=#{discard_nil_cached_result}"
+    end
     # Check if we can serve the result from the cache.
     if !ignore_cached_result && @result_cache.exists?(target_string) && !@result_cache.invalidated?(target_string)
       cached_result = @result_cache.get(target_string)
+      LSP::Log.info { "[compile] cache hit: #{target.decoded_path}" }
       return cached_result unless cached_result.nil? && discard_nil_cached_result
     end
 
@@ -161,6 +173,7 @@ class Crystalline::Workspace
       # Check again the cache in case some previous compilation that ran while waiting for the mutex to unlock is still valid.
       if !ignore_cached_result && @result_cache.exists?(target_string) && !@result_cache.invalidated?(target_string)
         cached_result = @result_cache.get(target_string)
+        LSP::Log.info { "[compile] cache hit after wait: #{target.decoded_path}" }
         return cached_result unless cached_result.nil? && discard_nil_cached_result
       end
 
@@ -190,6 +203,7 @@ class Crystalline::Workspace
         end
 
         lib_path = project.try(&.default_lib_path)
+        LSP::Log.info { "[compile] analysis start: #{target.decoded_path}" }
         result = Analysis.compile(server, sources || target, lib_path: lib_path, file_overrides: file_overrides, ignore_diagnostics: ignore_diagnostics, wants_doc: wants_doc, top_level: top_level, compiler_flags: project.try(&.flags) || [] of String)
         # Store the result in the cache, unless a client event invalided the previous cache.
         # For instance if a compilation is running, but the user saved the document in the meantime (before completion)
