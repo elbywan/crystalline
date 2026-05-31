@@ -1,3 +1,5 @@
+require "./type_utils"
+
 module Crystalline::Lightweight
   enum MethodContractKind
     YieldSelf
@@ -266,11 +268,7 @@ module Crystalline::Lightweight
     end
 
     private def expand_type_names(type_name : String) : Array(String)
-      normalized = type_name.strip
-      normalized = normalized[1...-1] if normalized.starts_with?('(') && normalized.ends_with?(')')
-      return [normalized] unless normalized.includes?(" | ")
-
-      normalized.split(" | ").map(&.strip).reject(&.empty?).uniq
+      TypeUtils.expand_type_names(type_name)
     end
   end
 end

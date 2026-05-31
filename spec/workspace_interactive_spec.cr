@@ -253,4 +253,191 @@ describe Crystalline::Workspace do
       hover.not_nil!.contents.as(LSP::MarkupContent).value.should contain("Greeter#whisper() : String")
     end
   end
+
+  it "uses dirty-buffer hover for relative namespace tuple and try chains" do
+    source = <<-CRYSTAL
+      module Outer
+        class Visitor
+          def process : Tuple(Array(String), Hash(String, Tuple(String | Nil, Int32 | Nil)))
+            {["hello"], {"key" => {nil, 1}}}
+          end
+        end
+
+        def self.demo
+          nodes, context = Visitor.new.process
+          nodes.last?.try do |node|
+            node.upcase
+          end
+        end
+      end
+    CRYSTAL
+
+    with_workspace_document(source) do |server, workspace, uri|
+      project = workspace.projects.first?.not_nil!
+      workspace.recalculate_dependencies(server, project)
+      result = Crystalline::Analysis.compile(
+        server,
+        uri,
+        lib_path: project.default_lib_path,
+        ignore_diagnostics: true,
+        wants_doc: true,
+        compiler_flags: project.flags,
+      )
+      result.should_not be_nil
+      project.semantic_summary = Crystalline::Lightweight::Summary.from_result(result.not_nil!)
+
+      mark_workspace_document_dirty(workspace.opened_documents[uri.to_s].not_nil!, source)
+
+      lines = source.lines(chomp: false)
+      line_number = lines.index! { |line| line.includes?("node.upcase") }
+      character = lines[line_number].rindex("upcase").not_nil! + 2
+      position = LSP::Position.new(line: line_number, character: character)
+
+      hover = workspace.hover(server, uri, position)
+      hover.should_not be_nil
+      hover.not_nil!.contents.as(LSP::MarkupContent).value.should contain("String#upcase")
+    end
+  end
+
+  it "uses dirty-buffer hover through is_a? and conditional-assignment helper chains" do
+    source = <<-CRYSTAL
+      module Outer
+        class Location
+          def expanded_location : String
+            "x"
+          end
+        end
+
+        class Item
+          def location : Outer::Location | Nil
+            Outer::Location.new
+          end
+        end
+
+        class Node
+          def target_defs : Array(Outer::Item) | Nil
+            [Outer::Item.new]
+          end
+        end
+
+        def self.demo(node : Outer::Node | String)
+          if node.is_a?(Outer::Node)
+            if (defs = node.target_defs)
+              defs.compact_map do |d|
+                d.location.try do |loc|
+                  loc.expanded_location.upcase
+                end
+              end
+            end
+          end
+        end
+      end
+    CRYSTAL
+
+    with_workspace_document(source) do |server, workspace, uri|
+      project = workspace.projects.first?.not_nil!
+      workspace.recalculate_dependencies(server, project)
+      result = Crystalline::Analysis.compile(
+        server,
+        uri,
+        lib_path: project.default_lib_path,
+        ignore_diagnostics: true,
+        wants_doc: true,
+        compiler_flags: project.flags,
+      )
+      result.should_not be_nil
+      project.semantic_summary = Crystalline::Lightweight::Summary.from_result(result.not_nil!)
+
+      mark_workspace_document_dirty(workspace.opened_documents[uri.to_s].not_nil!, source)
+
+      lines = source.lines(chomp: false)
+      line_number = lines.index! { |line| line.includes?("loc.expanded_location.upcase") }
+      character = lines[line_number].rindex("upcase").not_nil! + 2
+      position = LSP::Position.new(line: line_number, character: character)
+
+      hover = workspace.hover(server, uri, position)
+      hover.should_not be_nil
+      hover.not_nil!.contents.as(LSP::MarkupContent).value.should contain("String#upcase")
+    end
+  end
+
+  it "uses dirty-buffer hover inside exception-handler bodies" do
+    source = <<-CRYSTAL
+      def demo
+        reply_channel = Channel(String).new
+
+        begin
+          reply_channel.receive.upcase
+        rescue error : Exception
+          error.message
+        ensure
+          1
+        end
+      end
+    CRYSTAL
+
+    with_workspace_document(source) do |server, workspace, uri|
+      project = workspace.projects.first?.not_nil!
+      workspace.recalculate_dependencies(server, project)
+      result = Crystalline::Analysis.compile(
+        server,
+        uri,
+        lib_path: project.default_lib_path,
+        ignore_diagnostics: true,
+        wants_doc: true,
+        compiler_flags: project.flags,
+      )
+      result.should_not be_nil
+      project.semantic_summary = Crystalline::Lightweight::Summary.from_result(result.not_nil!)
+
+      mark_workspace_document_dirty(workspace.opened_documents[uri.to_s].not_nil!, source)
+
+      lines = source.lines(chomp: false)
+      line_number = lines.index! { |line| line.includes?("reply_channel.receive.upcase") }
+      character = lines[line_number].rindex("receive").not_nil! + 2
+      position = LSP::Position.new(line: line_number, character: character)
+
+      hover = workspace.hover(server, uri, position)
+      hover.should_not be_nil
+      hover.not_nil!.contents.as(LSP::MarkupContent).value.should contain("Channel(String)#receive()")
+    end
+  end
+
+  it "uses dirty-buffer hover inside assigned begin-style value bodies" do
+    source = <<-CRYSTAL
+      def demo(items : Array(String))
+        value = begin
+          items.each do |item|
+            item.upcase
+          end
+        end
+      end
+    CRYSTAL
+
+    with_workspace_document(source) do |server, workspace, uri|
+      project = workspace.projects.first?.not_nil!
+      workspace.recalculate_dependencies(server, project)
+      result = Crystalline::Analysis.compile(
+        server,
+        uri,
+        lib_path: project.default_lib_path,
+        ignore_diagnostics: true,
+        wants_doc: true,
+        compiler_flags: project.flags,
+      )
+      result.should_not be_nil
+      project.semantic_summary = Crystalline::Lightweight::Summary.from_result(result.not_nil!)
+
+      mark_workspace_document_dirty(workspace.opened_documents[uri.to_s].not_nil!, source)
+
+      lines = source.lines(chomp: false)
+      line_number = lines.index! { |line| line.includes?("item.upcase") }
+      character = lines[line_number].rindex("upcase").not_nil! + 2
+      position = LSP::Position.new(line: line_number, character: character)
+
+      hover = workspace.hover(server, uri, position)
+      hover.should_not be_nil
+      hover.not_nil!.contents.as(LSP::MarkupContent).value.should contain("String#upcase")
+    end
+  end
 end

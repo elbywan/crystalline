@@ -158,12 +158,12 @@ class Crystalline::Workspace
     target_string = target.to_s
     LSP::Log.info do
       source_kind = if in_memory
-        "in-memory"
-      elsif top_level
-        "top-level"
-      else
-        "filesystem"
-      end
+                      "in-memory"
+                    elsif top_level
+                      "top-level"
+                    else
+                      "filesystem"
+                    end
       "[compile] request: target=#{target.decoded_path} source=#{source_kind} ignore_cached=#{ignore_cached_result} discard_nil_cached=#{discard_nil_cached_result}"
     end
     # Check if we can serve the result from the cache.

@@ -1,4 +1,5 @@
 require "./inference"
+require "./type_utils"
 require "./query"
 
 module Crystalline::Lightweight
@@ -55,17 +56,18 @@ module Crystalline::Lightweight
     end
 
     private def root_receiver_types(source : String, line_number : Int32, analysis_column : Int32, receiver : String, query : Query) : {Array(String), Bool}
-      if type_name?(receiver)
-        return {[receiver], true} if query.find_type(receiver)
-        return {[] of String, true}
-      end
-
       inference = Inference.for(
         source,
         line_number + 1,
         analysis_column + 1,
         query,
       )
+
+      if type_name?(receiver)
+        resolved_name = query.resolve_type_name(receiver, namespace: inference.try(&.current_type_name))
+        return {[resolved_name], true} if resolved_name
+        return {[] of String, true}
+      end
 
       if receiver == "self"
         return inference.try(&.self_types) || {[] of String, false}
@@ -204,9 +206,7 @@ module Crystalline::Lightweight
     end
 
     private def normalize_type_names(type_name : String) : Array(String)
-      normalized = type_name.strip
-      normalized = normalized[1...-1] if normalized.starts_with?('(') && normalized.ends_with?(')')
-      normalized.includes?(" | ") ? normalized.split(" | ").map(&.strip).reject(&.empty?).uniq : [normalized]
+      TypeUtils.expand_type_names(type_name)
     end
 
     private def array_element_types(type_name : String) : Array(String)?

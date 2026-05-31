@@ -1,4 +1,5 @@
 require "./index"
+require "./type_utils"
 require "./summary"
 
 module Crystalline::Lightweight
@@ -8,6 +9,24 @@ module Crystalline::Lightweight
 
     def find_type(name : String) : TypeInfo?
       @index.types[name]? || generic_specialization_for(name).try(&.[0])
+    end
+
+    def resolve_type_name(name : String, namespace : String? = nil) : String?
+      normalized = name.strip
+      normalized = normalized.lchop("::")
+      return normalized if known_type_name?(normalized)
+
+      if namespace
+        namespace_candidates(namespace).each do |prefix|
+          candidate = "#{prefix}::#{normalized}"
+          return candidate if known_type_name?(candidate)
+        end
+      end
+
+      suffix_matches = all_type_names.select do |candidate|
+        candidate == normalized || candidate.ends_with?("::#{normalized}")
+      end
+      suffix_matches.size == 1 ? suffix_matches.first : nil
     end
 
     def methods_for(type_name : String, *, class_method = false, include_macros = false) : Array(MethodInfo)
@@ -97,6 +116,28 @@ module Crystalline::Lightweight
         return summary_type.class_vars.transform_values(&.dup) if summary_type.class_vars.any?
       end
       {} of String => Array(String)
+    end
+
+    private def known_type_name?(name : String) : Bool
+      @index.types.has_key?(name) || !generic_specialization_for(name).nil?
+    end
+
+    private def all_type_names : Array(String)
+      names = @index.types.keys
+      if summary = @summary
+        names += summary.types.keys
+      end
+      names.uniq
+    end
+
+    private def namespace_candidates(namespace : String) : Array(String)
+      parts = namespace.split("::")
+      candidates = [] of String
+      while parts.any?
+        candidates << parts.join("::")
+        parts.pop
+      end
+      candidates
     end
 
     private def summary_types_for(type_name : String) : Array(SummaryType)
@@ -305,9 +346,7 @@ module Crystalline::Lightweight
     end
 
     private def normalize_type_names(type_name : String) : Array(String)
-      normalized = type_name.strip
-      normalized = normalized[1...-1] if normalized.starts_with?('(') && normalized.ends_with?(')')
-      normalized.includes?(" | ") ? normalized.split(" | ").map(&.strip).reject(&.empty?).uniq : [normalized]
+      TypeUtils.expand_type_names(type_name)
     end
 
     private def merge_methods(base_methods : Array(MethodInfo), summary_methods : Array(MethodInfo)) : Array(MethodInfo)

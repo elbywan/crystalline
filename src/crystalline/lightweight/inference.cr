@@ -1,4 +1,5 @@
 require "compiler/crystal/syntax"
+require "./type_utils"
 require "./query"
 
 module Crystalline::Lightweight
@@ -65,6 +66,11 @@ module Crystalline::Lightweight
           process_node(expression, apply_cursor_bounds: apply_cursor_bounds)
         end
       when Crystal::Assign
+        if apply_cursor_bounds && contains_cursor?(node.value)
+          process_node(node.value, apply_cursor_bounds: true)
+          return
+        end
+
         return unless !apply_cursor_bounds || before_cursor?(node)
 
         types = infer_types(node.value)
@@ -79,6 +85,13 @@ module Crystalline::Lightweight
           @class_var_types[target.name] = types
         end
       when Crystal::MultiAssign
+        if apply_cursor_bounds && node.values.any? { |value| contains_cursor?(value) }
+          node.values.each do |value|
+            process_node(value, apply_cursor_bounds: true) if contains_cursor?(value)
+          end
+          return
+        end
+
         return unless !apply_cursor_bounds || before_cursor?(node)
 
         assign_multi_types(node)
@@ -94,6 +107,10 @@ module Crystalline::Lightweight
         return unless !apply_cursor_bounds || starts_before_or_at_cursor?(node)
 
         process_unless(node, apply_cursor_bounds: apply_cursor_bounds)
+      when Crystal::ExceptionHandler
+        return unless !apply_cursor_bounds || starts_before_or_at_cursor?(node)
+
+        process_exception_handler(node, apply_cursor_bounds: apply_cursor_bounds)
       else
         return unless !apply_cursor_bounds || before_cursor?(node)
       end
@@ -110,7 +127,11 @@ module Crystalline::Lightweight
       when Crystal::Self
         self_types[0]
       when Crystal::Path, Crystal::Generic
-        @query.find_type(node.to_s) ? [node.to_s] : [] of String
+        if type_name = @query.resolve_type_name(node.to_s, namespace: @current_type_name)
+          [type_name]
+        else
+          [] of String
+        end
       when Crystal::NilLiteral
         ["Nil"]
       when Crystal::BoolLiteral
@@ -163,6 +184,22 @@ module Crystalline::Lightweight
     end
 
     private def process_call(node : Crystal::Call, *, apply_cursor_bounds : Bool)
+      if apply_cursor_bounds
+        if object = node.obj
+          if contains_cursor?(object)
+            process_node(object, apply_cursor_bounds: true)
+            return
+          end
+        end
+
+        node.args.each do |arg|
+          if contains_cursor?(arg)
+            process_node(arg, apply_cursor_bounds: true)
+            return
+          end
+        end
+      end
+
       block = node.block
       return unless block
       return unless contains_cursor?(block)
@@ -344,7 +381,7 @@ module Crystalline::Lightweight
     private def type_expression_name(node : Crystal::ASTNode) : String?
       case node
       when Crystal::Path, Crystal::Generic
-        node.to_s
+        @query.resolve_type_name(node.to_s, namespace: @current_type_name)
       else
         nil
       end
@@ -550,11 +587,7 @@ module Crystalline::Lightweight
     end
 
     private def expand_type_names(type_name : String) : Array(String)
-      normalized = type_name.strip
-      normalized = normalized[1...-1] if normalized.starts_with?('(') && normalized.ends_with?(')')
-      return [normalized] unless normalized.includes?(" | ")
-
-      normalized.split(" | ").map(&.strip).reject(&.empty?).uniq
+      TypeUtils.expand_type_names(type_name)
     end
 
     private def number_kind_name(kind : Crystal::NumberKind) : String
@@ -616,13 +649,59 @@ module Crystalline::Lightweight
       found
     end
 
+    private def process_exception_handler(node : Crystal::ExceptionHandler, *, apply_cursor_bounds : Bool)
+      if !apply_cursor_bounds || contains_cursor?(node.body) || starts_before_or_at_cursor?(node.body)
+        process_node(node.body, apply_cursor_bounds: apply_cursor_bounds)
+        return if apply_cursor_bounds && contains_cursor?(node.body)
+      end
+
+      node.rescues.try &.each do |rescue_clause|
+        next unless !apply_cursor_bounds || contains_cursor?(rescue_clause.body)
+
+        saved_local_types = @local_types.dup
+        begin
+          seed_rescue_types(rescue_clause)
+          process_node(rescue_clause.body, apply_cursor_bounds: apply_cursor_bounds)
+        ensure
+          @local_types = saved_local_types.merge(@local_types) { |_, old_value, new_value| (old_value + new_value).uniq }
+        end
+        return if apply_cursor_bounds
+      end
+
+      if rescue_else = node.else
+        if !apply_cursor_bounds || contains_cursor?(rescue_else)
+          process_node(rescue_else, apply_cursor_bounds: apply_cursor_bounds)
+          return if apply_cursor_bounds
+        end
+      end
+
+      if ensure_clause = node.ensure
+        if !apply_cursor_bounds || contains_cursor?(ensure_clause)
+          process_node(ensure_clause, apply_cursor_bounds: apply_cursor_bounds)
+        end
+      end
+    end
+
+    private def seed_rescue_types(rescue_clause : Crystal::Rescue)
+      return unless name = rescue_clause.name
+
+      type_names = if types = rescue_clause.types
+        types.flat_map { |type| resolve_type_names(type.to_s) }.uniq
+      else
+        [@query.resolve_type_name("Exception", namespace: @current_type_name) || "Exception"]
+      end
+      @local_types[name] = type_names unless type_names.empty?
+    end
+
     private def process_if(node : Crystal::If, *, apply_cursor_bounds : Bool)
       if apply_cursor_bounds
         if contains_cursor?(node.then)
+          process_node(node.cond, apply_cursor_bounds: false)
           apply_condition_refinement(node.cond, truthy: true)
           process_node(node.then, apply_cursor_bounds: true)
           return
         elsif contains_cursor?(node.else)
+          process_node(node.cond, apply_cursor_bounds: false)
           apply_condition_refinement(node.cond, truthy: false)
           process_node(node.else, apply_cursor_bounds: true)
           return
@@ -635,10 +714,12 @@ module Crystalline::Lightweight
     private def process_unless(node : Crystal::Unless, *, apply_cursor_bounds : Bool)
       if apply_cursor_bounds
         if contains_cursor?(node.then)
+          process_node(node.cond, apply_cursor_bounds: false)
           apply_condition_refinement(node.cond, truthy: false)
           process_node(node.then, apply_cursor_bounds: true)
           return
         elsif contains_cursor?(node.else)
+          process_node(node.cond, apply_cursor_bounds: false)
           apply_condition_refinement(node.cond, truthy: true)
           process_node(node.else, apply_cursor_bounds: true)
           return
@@ -652,11 +733,13 @@ module Crystalline::Lightweight
       base_state = current_state
 
       restore_state(base_state)
+      process_node(cond, apply_cursor_bounds: false)
       apply_condition_refinement(cond, truthy: then_truthy)
       process_node(then_branch, apply_cursor_bounds: apply_cursor_bounds)
       then_state = current_state
 
       restore_state(base_state)
+      process_node(cond, apply_cursor_bounds: false)
       apply_condition_refinement(cond, truthy: else_truthy)
       process_node(else_branch, apply_cursor_bounds: apply_cursor_bounds)
       else_state = current_state
@@ -679,6 +762,10 @@ module Crystalline::Lightweight
 
     private def apply_condition_refinement(node : Crystal::ASTNode, *, truthy : Bool)
       case node
+      when Crystal::Expressions
+        if expression = node.expressions.first?
+          apply_condition_refinement(expression, truthy: truthy)
+        end
       when Crystal::Not
         apply_condition_refinement(node.exp, truthy: !truthy)
       when Crystal::And
@@ -697,13 +784,33 @@ module Crystalline::Lightweight
         if node.name == "nil?" && node.args.empty?
           refine_nil_check(node.obj, truthy: truthy)
         end
+      when Crystal::Assign
+        refine_condition_assignment(node, truthy: truthy)
       when Crystal::Var, Crystal::InstanceVar, Crystal::ClassVar
         refine_truthiness(node, truthy: truthy)
       end
     end
 
+    private def refine_condition_assignment(node : Crystal::Assign, *, truthy : Bool)
+      type_names = infer_types(node.value)
+      return if type_names.empty?
+
+      refined_types = if truthy
+        type_names.reject(&.==("Nil"))
+      elsif type_names.includes?("Nil")
+        ["Nil"]
+      else
+        type_names
+      end
+      return if refined_types.empty?
+
+      set_reference_types(node.target, refined_types)
+    end
+
     private def refine_is_a(node : Crystal::IsA, *, truthy : Bool)
-      target_type_names = expand_type_names(node.const.to_s)
+      target_type_names = expand_type_names(node.const.to_s).map { |name|
+        @query.resolve_type_name(name, namespace: @current_type_name) || name
+      }.uniq
       return if target_type_names.empty?
 
       if truthy
@@ -788,8 +895,14 @@ module Crystalline::Lightweight
     private def seed_arg_types(definition : Crystal::Def)
       definition.args.each do |arg|
         next unless restriction = arg.restriction
-        @local_types[arg.name] = expand_type_names(restriction.to_s)
+        @local_types[arg.name] = resolve_type_names(restriction.to_s)
       end
+    end
+
+    private def resolve_type_names(type_name : String) : Array(String)
+      expand_type_names(type_name).map { |name|
+        @query.resolve_type_name(name, namespace: @current_type_name) || name
+      }.uniq
     end
 
     private def seed_type_vars_from_summary
