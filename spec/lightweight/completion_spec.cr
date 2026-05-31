@@ -463,4 +463,66 @@ describe Crystalline::Lightweight::Completion do
     find_items = Crystalline::Lightweight::Completion.complete(source, find_line_number, find_context.not_nil!, query).not_nil!
     find_items.map(&.insert_text).compact.should contain("shout")
   end
+
+  it "completes richer hash and reducer helper flows" do
+    source = <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+      end
+
+      def demo
+        lookup = {"primary" => Greeter.new}
+        lookup.each do |key, value|
+          key.up
+          value.sh
+        end
+
+        numbers = [1, 2]
+        numbers.reduce do |memo, item|
+          memo.to_
+          item.to_
+        end
+
+        lookup.dig.sh
+
+        items = [Greeter.new]
+        items.find!.sh
+      end
+    CRYSTAL
+
+    query = build_lightweight_query(source)
+    lines = source.lines(chomp: false)
+
+    key_line_number = lines.index! { |item| item.includes?("key.up") }
+    key_context = Crystalline::CompletionContext.detect(lines[key_line_number], lines[key_line_number].size - 1, nil)
+    key_items = Crystalline::Lightweight::Completion.complete(source, key_line_number, key_context.not_nil!, query).not_nil!
+    key_items.map(&.insert_text).compact.should contain("upcase")
+
+    value_line_number = lines.index! { |item| item.includes?("value.sh") }
+    value_context = Crystalline::CompletionContext.detect(lines[value_line_number], lines[value_line_number].size - 1, nil)
+    value_items = Crystalline::Lightweight::Completion.complete(source, value_line_number, value_context.not_nil!, query).not_nil!
+    value_items.map(&.insert_text).compact.should contain("shout")
+
+    memo_line_number = lines.index! { |item| item.includes?("memo.to_") }
+    memo_context = Crystalline::CompletionContext.detect(lines[memo_line_number], lines[memo_line_number].size - 1, nil)
+    memo_items = Crystalline::Lightweight::Completion.complete(source, memo_line_number, memo_context.not_nil!, query).not_nil!
+    memo_items.map(&.insert_text).compact.should contain("to_i")
+
+    item_line_number = lines.index! { |item| item.includes?("item.to_") }
+    item_context = Crystalline::CompletionContext.detect(lines[item_line_number], lines[item_line_number].size - 1, nil)
+    item_items = Crystalline::Lightweight::Completion.complete(source, item_line_number, item_context.not_nil!, query).not_nil!
+    item_items.map(&.insert_text).compact.should contain("to_i")
+
+    dig_line_number = lines.index! { |item| item.includes?("lookup.dig.sh") }
+    dig_context = Crystalline::CompletionContext.detect(lines[dig_line_number], lines[dig_line_number].size - 1, nil)
+    dig_items = Crystalline::Lightweight::Completion.complete(source, dig_line_number, dig_context.not_nil!, query).not_nil!
+    dig_items.map(&.insert_text).compact.should contain("shout")
+
+    find_bang_line_number = lines.index! { |item| item.includes?("items.find!.sh") }
+    find_bang_context = Crystalline::CompletionContext.detect(lines[find_bang_line_number], lines[find_bang_line_number].size - 1, nil)
+    find_bang_items = Crystalline::Lightweight::Completion.complete(source, find_bang_line_number, find_bang_context.not_nil!, query).not_nil!
+    find_bang_items.map(&.insert_text).compact.should contain("shout")
+  end
 end

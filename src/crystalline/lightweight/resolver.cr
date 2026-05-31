@@ -154,7 +154,7 @@ module Crystalline::Lightweight
         return normalize_type_names(type_name).reject(&.==("Nil"))
       when "tap", "each", "each_with_index", "select", "reject"
         return [type_name]
-      when "first", "last", "[]"
+      when "first", "last", "[]", "find!", "reduce"
         if element_types = array_element_types(type_name)
           return element_types.select { |item| receiver_type_known?(item, query) || query.find_type(item) != nil }
         elsif tuple_types = tuple_element_types(type_name)
@@ -167,7 +167,7 @@ module Crystalline::Lightweight
         elsif value_types = hash_value_types(type_name)
           return value_types.select { |item| receiver_type_known?(item, query) || query.find_type(item) != nil }
         end
-      when "first?", "last?", "[]?", "find"
+      when "first?", "last?", "[]?", "find", "dig"
         if element_types = array_element_types(type_name)
           return (element_types + ["Nil"]).uniq
         elsif tuple_types = tuple_element_types(type_name)
@@ -180,6 +180,8 @@ module Crystalline::Lightweight
           end
           return (selected + ["Nil"]).uniq
         elsif value_types = hash_value_types(type_name)
+          return (value_types + ["Nil"]).uniq
+        elsif value_types = named_tuple_all_value_types(type_name)
           return (value_types + ["Nil"]).uniq
         end
       when "fetch"
@@ -213,6 +215,20 @@ module Crystalline::Lightweight
 
     private def hash_value_types(type_name : String) : Array(String)?
       generic_type_arguments(type_name, "Hash", 2).try { |parts| normalize_type_names(parts[1]) }
+    end
+
+    private def named_tuple_all_value_types(type_name : String) : Array(String)?
+      normalized = type_name.strip
+      prefix = "NamedTuple("
+      return unless normalized.starts_with?(prefix) && normalized.ends_with?(')')
+
+      value_types = split_top_level(normalized[prefix.size...-1]).flat_map do |part|
+        _, value = part.split(":", 2)
+        next [] of String unless value
+        normalize_type_names(value.strip)
+      end.uniq
+
+      value_types.empty? ? nil : value_types
     end
 
     private def tuple_element_types(type_name : String) : Array(Array(String))?

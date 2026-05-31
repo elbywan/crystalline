@@ -84,10 +84,23 @@ module Crystalline::Lightweight
 
       if element_types = array_element_types(owner_name)
         case method.name
-        when "each", "map", "select", "reject", "compact_map"
+        when "each", "map", "select", "reject", "find", "compact_map"
           contracts << MethodContract.new(kind: MethodContractKind::YieldElement, types: element_types, class_method: method.class_method)
         when "each_with_index", "map_with_index"
           contracts << MethodContract.new(kind: MethodContractKind::YieldElementWithIndex, types: element_types + ["Int32"], class_method: method.class_method)
+        when "reduce"
+          contracts << MethodContract.new(kind: MethodContractKind::YieldAccumulatorAndElement, block_args: [element_types, element_types], class_method: method.class_method)
+        end
+
+        case method.name
+        when "each", "each_with_index", "select", "reject"
+          contracts << MethodContract.new(kind: MethodContractKind::PreserveReceiver, types: [owner_name], class_method: method.class_method)
+        when "first", "last", "[]", "find!"
+          contracts << MethodContract.new(kind: MethodContractKind::ReturnElement, types: element_types, class_method: method.class_method)
+        when "first?", "last?", "[]?", "find", "dig"
+          contracts << MethodContract.new(kind: MethodContractKind::ReturnElementOrNil, types: element_types, class_method: method.class_method)
+        when "reduce"
+          contracts << MethodContract.new(kind: MethodContractKind::ReturnElement, types: element_types, class_method: method.class_method)
         end
 
         if normalized_return_types.sort == element_types.sort
@@ -97,11 +110,31 @@ module Crystalline::Lightweight
         end
       end
 
-      if value_types = hash_value_types(owner_name)
-        if normalized_return_types.sort == value_types.sort
-          contracts << MethodContract.new(kind: MethodContractKind::ReturnValue, types: value_types, class_method: method.class_method)
-        elsif normalized_return_types.sort == (value_types + ["Nil"]).uniq.sort
-          contracts << MethodContract.new(kind: MethodContractKind::ReturnValueOrNil, types: value_types, class_method: method.class_method)
+      if key_types = hash_key_types(owner_name)
+        if value_types = hash_value_types(owner_name)
+          case method.name
+          when "each", "map", "select", "reject", "find", "compact_map"
+            contracts << MethodContract.new(kind: MethodContractKind::YieldKeyValue, block_args: [key_types, value_types], class_method: method.class_method)
+          when "each_key"
+            contracts << MethodContract.new(kind: MethodContractKind::YieldKey, types: key_types, class_method: method.class_method)
+          when "each_value"
+            contracts << MethodContract.new(kind: MethodContractKind::YieldValue, types: value_types, class_method: method.class_method)
+          end
+
+          case method.name
+          when "each", "select", "reject"
+            contracts << MethodContract.new(kind: MethodContractKind::PreserveReceiver, types: [owner_name], class_method: method.class_method)
+          when "[]", "fetch"
+            contracts << MethodContract.new(kind: MethodContractKind::ReturnValue, types: value_types, class_method: method.class_method)
+          when "[]?", "dig"
+            contracts << MethodContract.new(kind: MethodContractKind::ReturnValueOrNil, types: value_types, class_method: method.class_method)
+          end
+
+          if normalized_return_types.sort == value_types.sort
+            contracts << MethodContract.new(kind: MethodContractKind::ReturnValue, types: value_types, class_method: method.class_method)
+          elsif normalized_return_types.sort == (value_types + ["Nil"]).uniq.sort
+            contracts << MethodContract.new(kind: MethodContractKind::ReturnValueOrNil, types: value_types, class_method: method.class_method)
+          end
         end
       end
 
@@ -114,6 +147,10 @@ module Crystalline::Lightweight
 
     private def array_element_types(type_name : String) : Array(String)?
       generic_type_arguments(type_name, "Array", 1).try { |parts| normalize_type_names(parts[0]) }
+    end
+
+    private def hash_key_types(type_name : String) : Array(String)?
+      generic_type_arguments(type_name, "Hash", 2).try { |parts| normalize_type_names(parts[0]) }
     end
 
     private def hash_value_types(type_name : String) : Array(String)?

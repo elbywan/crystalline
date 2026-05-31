@@ -366,4 +366,72 @@ describe Crystalline::Lightweight::Hover do
     find_hover.should_not be_nil
     hover_value(find_hover.not_nil!).should contain("Greeter#shout() : String")
   end
+
+  it "hovers richer hash and reducer helper flows" do
+    source = <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+      end
+
+      def demo
+        lookup = {"primary" => Greeter.new}
+        lookup.each do |key, value|
+          key
+          value
+        end
+
+        numbers = [1, 2]
+        numbers.reduce do |memo, item|
+          memo
+          item
+        end
+
+        lookup.dig.shout
+
+        items = [Greeter.new]
+        items.find!.shout
+      end
+    CRYSTAL
+
+    query = build_lightweight_hover_query(source)
+    lines = source.lines(chomp: false)
+
+    key_line_number = lines.index! { |item| item.strip == "key" }
+    key_column_number = lines[key_line_number].index("key").not_nil! + 1
+    key_hover = Crystalline::Lightweight::Hover.hover(source, key_line_number, key_column_number, query)
+    key_hover.should_not be_nil
+    hover_value(key_hover.not_nil!).should contain("key : String")
+
+    value_line_number = lines.index! { |item| item.strip == "value" }
+    value_column_number = lines[value_line_number].index("value").not_nil! + 1
+    value_hover = Crystalline::Lightweight::Hover.hover(source, value_line_number, value_column_number, query)
+    value_hover.should_not be_nil
+    hover_value(value_hover.not_nil!).should contain("value : Greeter")
+
+    memo_line_number = lines.index! { |item| item.strip == "memo" }
+    memo_column_number = lines[memo_line_number].index("memo").not_nil! + 1
+    memo_hover = Crystalline::Lightweight::Hover.hover(source, memo_line_number, memo_column_number, query)
+    memo_hover.should_not be_nil
+    hover_value(memo_hover.not_nil!).should contain("memo : Int32")
+
+    item_line_number = lines.index! { |item| item.strip == "item" }
+    item_column_number = lines[item_line_number].index("item").not_nil! + 1
+    item_hover = Crystalline::Lightweight::Hover.hover(source, item_line_number, item_column_number, query)
+    item_hover.should_not be_nil
+    hover_value(item_hover.not_nil!).should contain("item : Int32")
+
+    dig_line_number = lines.index! { |item| item.strip == "lookup.dig.shout" }
+    dig_column_number = lines[dig_line_number].rindex("shout").not_nil! + 2
+    dig_hover = Crystalline::Lightweight::Hover.hover(source, dig_line_number, dig_column_number, query)
+    dig_hover.should_not be_nil
+    hover_value(dig_hover.not_nil!).should contain("Greeter#shout() : String")
+
+    find_bang_line_number = lines.index! { |item| item.strip == "items.find!.shout" }
+    find_bang_column_number = lines[find_bang_line_number].rindex("shout").not_nil! + 2
+    find_bang_hover = Crystalline::Lightweight::Hover.hover(source, find_bang_line_number, find_bang_column_number, query)
+    find_bang_hover.should_not be_nil
+    hover_value(find_bang_hover.not_nil!).should contain("Greeter#shout() : String")
+  end
 end

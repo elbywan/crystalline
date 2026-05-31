@@ -199,11 +199,19 @@ module Crystalline::Lightweight
         non_nil_types = object_types.reject(&.==("Nil")).uniq
         return non_nil_types.empty? ? [] of Array(String) : [non_nil_types]
       when "each", "map", "select", "reject", "find", "compact_map"
+        hash_types = hash_block_argument_types(object_types)
+        return hash_types unless hash_types.empty?
         return array_block_argument_types(object_types)
       when "each_with_index", "map_with_index"
         element_types = array_block_argument_types(object_types).first?
         return [] of Array(String) unless element_types
         [element_types, ["Int32"]]
+      when "each_key"
+        return hash_key_block_argument_types(object_types)
+      when "each_value"
+        return hash_value_block_argument_types(object_types)
+      when "reduce"
+        return reduce_block_argument_types(object_types)
       else
         [] of Array(String)
       end
@@ -215,8 +223,13 @@ module Crystalline::Lightweight
 
       block_types = [] of Array(String)
       contracts.each do |contract|
+        if contract.block_args.any?
+          block_types.concat(contract.block_args.map(&.dup))
+          next
+        end
+
         case contract.kind
-        when .yield_self?, .yield_element?
+        when .yield_self?, .yield_element?, .yield_key?, .yield_value?
           block_types << contract.types unless contract.types.empty?
         when .yield_element_with_index?
           if contract.types.size >= 2
@@ -233,6 +246,33 @@ module Crystalline::Lightweight
 
       element_types = object_types.flat_map { |type_name| array_element_types(type_name) || [] of String }.uniq
       element_types.empty? ? [] of Array(String) : [element_types]
+    end
+
+    private def hash_block_argument_types(object_types : Array(String)) : Array(Array(String))
+      return [] of Array(String) if object_types.empty?
+
+      key_types = object_types.flat_map { |type_name| hash_key_types(type_name) || [] of String }.uniq
+      value_types = object_types.flat_map { |type_name| hash_value_types(type_name) || [] of String }.uniq
+      return [] of Array(String) if key_types.empty? || value_types.empty?
+
+      [key_types, value_types]
+    end
+
+    private def hash_key_block_argument_types(object_types : Array(String)) : Array(Array(String))
+      key_types = object_types.flat_map { |type_name| hash_key_types(type_name) || [] of String }.uniq
+      key_types.empty? ? [] of Array(String) : [key_types]
+    end
+
+    private def hash_value_block_argument_types(object_types : Array(String)) : Array(Array(String))
+      value_types = object_types.flat_map { |type_name| hash_value_types(type_name) || [] of String }.uniq
+      value_types.empty? ? [] of Array(String) : [value_types]
+    end
+
+    private def reduce_block_argument_types(object_types : Array(String)) : Array(Array(String))
+      element_types = object_types.flat_map { |type_name| array_element_types(type_name) || [] of String }.uniq
+      return [] of Array(String) if element_types.empty?
+
+      [element_types, element_types]
     end
 
     private def destructured_value_types(node : Crystal::ASTNode) : Array(Array(String))
@@ -360,12 +400,33 @@ module Crystalline::Lightweight
     private def container_call_types(type_name : String, method_name : String) : Array(String)
       if element_types = array_element_types(type_name)
         case method_name
-        when "first", "last", "[]"
+        when "first", "last", "[]", "find!", "reduce"
           return element_types
-        when "first?", "last?", "[]?", "find"
+        when "first?", "last?", "[]?", "find", "dig"
           return (element_types + ["Nil"]).uniq
         when "select", "reject", "each", "each_with_index"
           return [type_name]
+        end
+      end
+
+      if value_types = hash_value_types(type_name)
+        case method_name
+        when "[]", "fetch"
+          return value_types
+        when "[]?", "dig"
+          return (value_types + ["Nil"]).uniq
+        when "select", "reject", "each"
+          return [type_name]
+        end
+      end
+
+      if method_name == "dig"
+        if tuple_types = tuple_element_types(type_name)
+          return (tuple_types.flatten + ["Nil"]).uniq
+        end
+
+        if value_types = named_tuple_all_value_types(type_name)
+          return (value_types + ["Nil"]).uniq
         end
       end
 
@@ -382,15 +443,6 @@ module Crystalline::Lightweight
         end
       end
 
-      if value_types = hash_value_types(type_name)
-        case method_name
-        when "[]", "fetch"
-          return value_types
-        when "[]?"
-          return (value_types + ["Nil"]).uniq
-        end
-      end
-
       if value_types = named_tuple_value_types(type_name, method_name)
         return value_types
       end
@@ -400,6 +452,10 @@ module Crystalline::Lightweight
 
     private def array_element_types(type_name : String) : Array(String)?
       generic_type_arguments(type_name, "Array", 1).try { |parts| expand_type_names(parts[0]) }
+    end
+
+    private def hash_key_types(type_name : String) : Array(String)?
+      generic_type_arguments(type_name, "Hash", 2).try { |parts| expand_type_names(parts[0]) }
     end
 
     private def hash_value_types(type_name : String) : Array(String)?
@@ -431,6 +487,20 @@ module Crystalline::Lightweight
       end
 
       nil
+    end
+
+    private def named_tuple_all_value_types(type_name : String) : Array(String)?
+      normalized = type_name.strip
+      prefix = "NamedTuple("
+      return unless normalized.starts_with?(prefix) && normalized.ends_with?(')')
+
+      value_types = split_top_level(normalized[prefix.size...-1]).flat_map do |part|
+        _, value = part.split(":", 2)
+        next [] of String unless value
+        expand_type_names(value.strip)
+      end.uniq
+
+      value_types.empty? ? nil : value_types
     end
 
     private def generic_type_arguments(type_name : String, generic_name : String, arity : Int32?) : Array(String)?

@@ -258,4 +258,79 @@ describe Crystalline::Lightweight::Inference do
     inference = inference.not_nil!
     inference.types_for("resolved").should eq(["Greeter"])
   end
+
+  it "infers block args and container return types for richer collection helpers" do
+    index = build_lightweight_index <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+      end
+    CRYSTAL
+
+    source = <<-CRYSTAL
+      def demo
+        lookup = {"primary" => Greeter.new}
+        lookup.each do |key, value|
+          key
+          value
+        end
+
+        numbers = [1, 2]
+        numbers.reduce do |memo, item|
+          memo
+          item
+        end
+
+        found = lookup.dig
+        current = numbers.find!
+        found
+        current
+      end
+    CRYSTAL
+
+    lines = source.lines(chomp: false)
+
+    key_line_number = lines.index! { |line| line.strip == "key" } + 1
+    key_column_number = lines[key_line_number - 1].index("key").not_nil! + 2
+    hash_inference = Crystalline::Lightweight::Inference.for(
+      source,
+      key_line_number,
+      key_column_number,
+      Crystalline::Lightweight::Query.new(index),
+    )
+
+    hash_inference.should_not be_nil
+    hash_inference = hash_inference.not_nil!
+    hash_inference.types_for("key").should eq(["String"])
+    hash_inference.types_for("value").should eq(["Greeter"])
+
+    memo_line_number = lines.index! { |line| line.strip == "memo" } + 1
+    memo_column_number = lines[memo_line_number - 1].index("memo").not_nil! + 2
+    reduce_inference = Crystalline::Lightweight::Inference.for(
+      source,
+      memo_line_number,
+      memo_column_number,
+      Crystalline::Lightweight::Query.new(index),
+    )
+
+    reduce_inference.should_not be_nil
+    reduce_inference = reduce_inference.not_nil!
+    reduce_inference.types_for("memo").should eq(["Int32"])
+    reduce_inference.types_for("item").should eq(["Int32"])
+
+    found_line_number = lines.index! { |line| line.strip == "found" } + 1
+    found_column_number = lines[found_line_number - 1].index("found").not_nil! + 2
+    return_inference = Crystalline::Lightweight::Inference.for(
+      source,
+      found_line_number,
+      found_column_number,
+      Crystalline::Lightweight::Query.new(index),
+    )
+
+    return_inference.should_not be_nil
+    return_inference = return_inference.not_nil!
+    return_inference.types_for("found").should eq(["Greeter", "Nil"])
+    return_inference.types_for("current").should eq(["Int32"])
+  end
 end
