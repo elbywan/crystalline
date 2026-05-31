@@ -134,23 +134,6 @@ module Crystalline::Lightweight
     end
 
     private def special_return_type_names(type_name : String, method_name : String, query : Query) : Array(String)
-      if contracts = query.method_contracts_for(type_name, method_name)
-        contract_types = [] of String
-        contracts.each do |contract|
-          case contract.kind
-          when .preserve_receiver?
-            contract_types.concat(contract.types)
-          when .return_element?, .return_value?
-            contract_types.concat(contract.types)
-          when .return_element_or_nil?, .return_value_or_nil?
-            contract_types.concat(contract.types)
-            contract_types << "Nil"
-          end
-        end
-        contract_types = contract_types.uniq
-        return contract_types unless contract_types.empty?
-      end
-
       case method_name
       when "not_nil!"
         return normalize_type_names(type_name).reject(&.==("Nil"))
@@ -194,6 +177,23 @@ module Crystalline::Lightweight
         if value_types = named_tuple_value_types(type_name, method_name)
           return value_types.select { |item| receiver_type_known?(item, query) || query.find_type(item) != nil }
         end
+      end
+
+      if contracts = query.method_contracts_for(type_name, method_name)
+        contract_types = [] of String
+        contracts.each do |contract|
+          case contract.kind
+          when .preserve_receiver?
+            contract_types.concat(contract.types)
+          when .return_element?, .return_value?
+            contract_types.concat(contract.types)
+          when .return_element_or_nil?, .return_value_or_nil?
+            contract_types.concat(contract.types)
+            contract_types << "Nil"
+          end
+        end
+        contract_types = contract_types.uniq
+        return contract_types unless contract_types.empty?
       end
 
       [] of String

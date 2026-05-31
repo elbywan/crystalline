@@ -392,6 +392,7 @@ describe Crystalline::Lightweight::Hover do
 
         items = [Greeter.new]
         items.find!.shout
+        items.compact_map
       end
     CRYSTAL
 
@@ -433,5 +434,11 @@ describe Crystalline::Lightweight::Hover do
     find_bang_hover = Crystalline::Lightweight::Hover.hover(source, find_bang_line_number, find_bang_column_number, query)
     find_bang_hover.should_not be_nil
     hover_value(find_bang_hover.not_nil!).should contain("Greeter#shout() : String")
+
+    inherited_line_number = lines.index! { |item| item.strip == "items.compact_map" }
+    inherited_column_number = lines[inherited_line_number].rindex("compact_map").not_nil! + 2
+    inherited_hover = Crystalline::Lightweight::Hover.hover(source, inherited_line_number, inherited_column_number, query)
+    inherited_hover.should_not be_nil
+    hover_value(inherited_hover.not_nil!).should contain("compact_map")
   end
 end

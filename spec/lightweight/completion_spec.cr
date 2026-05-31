@@ -489,6 +489,7 @@ describe Crystalline::Lightweight::Completion do
 
         items = [Greeter.new]
         items.find!.sh
+        items.comp
       end
     CRYSTAL
 
@@ -524,5 +525,10 @@ describe Crystalline::Lightweight::Completion do
     find_bang_context = Crystalline::CompletionContext.detect(lines[find_bang_line_number], lines[find_bang_line_number].size - 1, nil)
     find_bang_items = Crystalline::Lightweight::Completion.complete(source, find_bang_line_number, find_bang_context.not_nil!, query).not_nil!
     find_bang_items.map(&.insert_text).compact.should contain("shout")
+
+    inherited_line_number = lines.index! { |item| item.includes?("items.comp") }
+    inherited_context = Crystalline::CompletionContext.detect(lines[inherited_line_number], lines[inherited_line_number].size - 1, nil)
+    inherited_items = Crystalline::Lightweight::Completion.complete(source, inherited_line_number, inherited_context.not_nil!, query).not_nil!
+    inherited_items.map(&.insert_text).compact.should contain("compact_map")
   end
 end

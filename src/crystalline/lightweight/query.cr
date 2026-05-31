@@ -30,30 +30,7 @@ module Crystalline::Lightweight
     end
 
     def methods_for(type_name : String, *, class_method = false, include_macros = false) : Array(MethodInfo)
-      methods = [] of MethodInfo
-
-      if type = @index.types[type_name]?
-        methods.concat(type.methods.select do |method|
-          method.class_method == class_method && (include_macros || !method.macro)
-        end)
-      elsif specialization = generic_specialization_for(type_name)
-        generic_type, mapping = specialization
-        methods.concat(generic_type.methods.select { |method|
-          method.class_method == class_method && (include_macros || !method.macro)
-        }.map { |method|
-          specialize_method(method, owner_name: type_name, mapping: mapping)
-        })
-      elsif type = find_type(type_name)
-        methods.concat(type.methods.select do |method|
-          method.class_method == class_method && (include_macros || !method.macro)
-        end)
-      end
-
-      summary_types_for(type_name).each do |summary_type|
-        methods = merge_methods(methods, summary_type.methods.select(&.class_method.==(class_method)))
-      end
-
-      methods
+      methods_for(type_name, class_method: class_method, include_macros: include_macros, visited: Set(String).new)
     end
 
     def subtypes_for(type_name : String) : Array(String)
@@ -152,6 +129,47 @@ module Crystalline::Lightweight
       end
 
       types
+    end
+
+    private def methods_for(type_name : String, *, class_method : Bool, include_macros : Bool, visited : Set(String)) : Array(MethodInfo)
+      visit_key = "#{type_name}:#{class_method}:#{include_macros}"
+      return [] of MethodInfo if visited.includes?(visit_key)
+      visited << visit_key
+
+      methods = [] of MethodInfo
+      parent_types = [] of String
+
+      if type = @index.types[type_name]?
+        methods.concat(type.methods.select do |method|
+          method.class_method == class_method && (include_macros || !method.macro)
+        end)
+        parent_types = type.parent_types.dup
+      elsif specialization = generic_specialization_for(type_name)
+        generic_type, mapping = specialization
+        methods.concat(generic_type.methods.select { |method|
+          method.class_method == class_method && (include_macros || !method.macro)
+        }.map { |method|
+          specialize_method(method, owner_name: type_name, mapping: mapping)
+        })
+        parent_types = generic_type.parent_types.map do |parent_type|
+          substitute_type_vars(parent_type, mapping).not_nil!
+        end
+      elsif type = find_type(type_name)
+        methods.concat(type.methods.select do |method|
+          method.class_method == class_method && (include_macros || !method.macro)
+        end)
+        parent_types = type.parent_types.dup
+      end
+
+      parent_types.each do |parent_type|
+        methods = merge_methods(methods, methods_for(parent_type, class_method: class_method, include_macros: include_macros, visited: visited))
+      end
+
+      summary_types_for(type_name).each do |summary_type|
+        methods = merge_methods(methods, summary_type.methods.select(&.class_method.==(class_method)))
+      end
+
+      methods
     end
 
     private def generic_specialization_for(type_name : String) : {TypeInfo, Hash(String, String)}?

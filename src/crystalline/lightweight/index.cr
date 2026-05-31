@@ -29,6 +29,7 @@ module Crystalline::Lightweight
     getter doc : String?
     getter methods = [] of MethodInfo
     getter subtypes = [] of String
+    getter parent_types = [] of String
 
     def initialize(@name : String, @kind : TypeKind, @doc : String? = nil)
     end
@@ -88,6 +89,10 @@ module Crystalline::Lightweight
 
         type.subtypes.each do |subtype|
           target_type.subtypes << subtype unless target_type.subtypes.includes?(subtype)
+        end
+
+        type.parent_types.each do |parent_type|
+          target_type.parent_types << parent_type unless target_type.parent_types.includes?(parent_type)
         end
       end
 
@@ -182,6 +187,11 @@ module Crystalline::Lightweight
             end
           end
         end
+      end
+
+      type.parents.try &.each do |parent_type|
+        parent_name = parent_type.to_s
+        type_info.parent_types << parent_name unless type_info.parent_types.includes?(parent_name)
       end
 
       if nested_types = type.types?
