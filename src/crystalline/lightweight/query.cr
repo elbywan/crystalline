@@ -252,9 +252,7 @@ module Crystalline::Lightweight
     private def substitute_type_vars(type_name : String?, mapping : Hash(String, String)) : String?
       return unless type_name
 
-      mapping.reduce(type_name) do |value, (param, replacement)|
-        value.gsub(/\b#{Regex.escape(param)}\b/, replacement)
-      end
+      TypeUtils.substitute_generic_params(type_name, mapping)
     end
 
     private def infer_contracts(owner_name : String, method : MethodInfo) : Array(MethodContract)

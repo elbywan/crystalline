@@ -141,6 +141,21 @@ describe Crystalline::Lightweight::Summary do
     items.not_nil!.map(&.insert_text).compact.should contain("shout")
   end
 
+  it "specializes inherited splat generic owners for tuple receivers" do
+    query = build_query_with_summary <<-CRYSTAL
+      def demo
+        tuple_pair = {1, "x"}
+        tuple_pair.each_with_object([] of String) do |item, memo|
+          memo << item.to_s
+        end
+      end
+    CRYSTAL
+
+    each_with_object_method = query.methods_for("Tuple(Int32, String)").find(&.name.==("each_with_object"))
+    each_with_object_method.should_not be_nil
+    each_with_object_method.not_nil!.owner.should eq("Enumerable(Int32 | String)")
+  end
+
   it "uses semantic summaries for tuple destructuring and try block inference" do
     source = <<-CRYSTAL
       class Greeter
