@@ -55,6 +55,7 @@ class Crystalline::Workspace
       }
     }
     @result_cache.invalidate(file_uri)
+    invalidate_semantic_cache(URI.parse(file_uri))
     # spawn self.compile(server, URI.parse(file_uri), in_memory: true )
   end
 
@@ -62,12 +63,15 @@ class Crystalline::Workspace
     file_uri = params.text_document.uri
     document = @opened_documents.delete(params.text_document.uri)
     @result_cache.invalidate(file_uri)
+    invalidate_semantic_cache(URI.parse(file_uri))
     Diagnostics.new.init_value(file_uri).publish(server) unless document.try(&.project?)
   end
 
   def save_document(server : LSP::Server, params : LSP::DidSaveTextDocumentParams)
     file_uri = params.text_document.uri
+    @opened_documents[file_uri]?.try &.mark_saved
     @result_cache.invalidate(file_uri)
+    invalidate_semantic_cache(URI.parse(file_uri))
   end
 
   def format_document(params : LSP::DocumentFormattingParams) : {String, TextDocument}?
@@ -249,6 +253,14 @@ class Crystalline::Workspace
     end
   end
 
+  private def invalidate_semantic_cache(file_uri : URI)
+    @semantic_cache.delete(semantic_cache_key(file_uri))
+  end
+
+  private def semantic_cache_allowed?(file_uri : URI) : Bool
+    @opened_documents[file_uri.to_s]?.try(&.dirty?) != true
+  end
+
   private def append_markdown_doc(contents : Array(String), doc : String?)
     if doc
       contents << "----------"
@@ -276,6 +288,11 @@ class Crystalline::Workspace
         LSP::Log.info { "[hover] lightweight hit: #{file_uri.decoded_path}:#{position.line}:#{position.character}" }
         return hover
       end
+    end
+
+    unless semantic_cache_allowed?(file_uri)
+      LSP::Log.info { "[hover] bail on dirty buffer: #{file_uri.decoded_path}:#{position.line}:#{position.character}" }
+      return
     end
 
     result = @semantic_cache[semantic_cache_key(file_uri)]?
@@ -356,6 +373,11 @@ class Crystalline::Workspace
   end
 
   def definitions(server : LSP::Server, file_uri : URI, position : LSP::Position)
+    unless semantic_cache_allowed?(file_uri)
+      LSP::Log.info { "[definitions] bail on dirty buffer: #{file_uri.decoded_path}:#{position.line}:#{position.character}" }
+      return
+    end
+
     result = @semantic_cache[semantic_cache_key(file_uri)]?
     unless result
       LSP::Log.info { "[definitions] bail without compile: #{file_uri.decoded_path}:#{position.line}:#{position.character}" }
@@ -437,6 +459,11 @@ class Crystalline::Workspace
       line_number: position.line + 1,
       column_number: completion_context.analysis_column,
     )
+
+    unless semantic_cache_allowed?(file_uri)
+      LSP::Log.info { "[completion] bail on dirty buffer: #{file_uri.decoded_path}:#{position.line}:#{position.character}" }
+      return
+    end
 
     result = @semantic_cache[semantic_cache_key(file_uri)]?
     unless result

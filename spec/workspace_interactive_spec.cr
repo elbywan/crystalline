@@ -28,6 +28,12 @@ private def with_workspace_document(source : String)
   end
 end
 
+class Crystalline::Workspace
+  def seed_semantic_result(key : String, result : Crystal::Compiler::Result)
+    @semantic_cache[key] = result
+  end
+end
+
 describe Crystalline::Workspace do
   it "does not compile unsupported completion requests without a semantic cache" do
     source = <<-CRYSTAL
@@ -109,4 +115,43 @@ describe Crystalline::Workspace do
     end
   end
 
+  it "does not use stale semantic cache for dirty buffers" do
+    source = <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+      end
+
+      def demo(greeter : Greeter)
+        greeter.shout
+      end
+    CRYSTAL
+
+    with_workspace_document(source) do |server, workspace, uri|
+      project = workspace.projects.first?.not_nil!
+      result = Crystalline::Analysis.compile(
+        server,
+        uri,
+        lib_path: project.default_lib_path,
+        ignore_diagnostics: true,
+        wants_doc: true,
+        compiler_flags: project.flags,
+      )
+      result.should_not be_nil
+      workspace.seed_semantic_result(project.entry_point?.not_nil!.to_s, result.not_nil!)
+
+      workspace.opened_documents[uri.to_s].not_nil!.update_contents([
+        {"sh", LSP::Range.new(
+          start: LSP::Position.new(line: 6, character: 16),
+          end: LSP::Position.new(line: 6, character: 21),
+        )},
+      ], version: 1)
+
+      position = LSP::Position.new(line: 6, character: 18)
+      workspace.hover(server, uri, position).should be_nil
+      workspace.completion(server, uri, position, nil).should be_nil
+      workspace.definitions(server, uri, position).should be_nil
+    end
+  end
 end

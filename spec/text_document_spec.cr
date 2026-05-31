@@ -80,4 +80,23 @@ describe Crystalline::TextDocument do
     document.contents.should eq("zap\n")
     document.version.should eq(5)
   end
+
+  it "tracks dirty state across edits and saves" do
+    document = doc("foo\n")
+
+    document.dirty?.should be_false
+
+    document.update_contents([
+      {"bar", LSP::Range.new(
+        start: LSP::Position.new(line: 0, character: 0),
+        end: LSP::Position.new(line: 0, character: 3),
+      )},
+    ], version: 1)
+
+    document.dirty?.should be_true
+
+    document.mark_saved
+
+    document.dirty?.should be_false
+  end
 end
