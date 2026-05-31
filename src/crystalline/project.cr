@@ -86,10 +86,11 @@ class Crystalline::Project
   # dependency of this workspace's entry point, returns nil.
   def distance_to_dependency(file_uri : URI) : Int32?
     relative = Path[file_uri.decoded_path].relative_to?(root_uri.decoded_path)
+    return nil if relative.nil?
 
-    # If we can't get a relative path, give it the maximum distance possible, so
-    # it's the lowest priority.
-    return Int32::MAX if relative.nil?
+    if dependencies.present? && !dependencies.includes?(file_uri.decoded_path)
+      return nil
+    end
 
     relative.parts.size
   end

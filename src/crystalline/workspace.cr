@@ -37,7 +37,7 @@ class Crystalline::Workspace
   def open_document(params : LSP::DidOpenTextDocumentParams)
     raw_uri = params.text_document.uri
     uri = URI.parse(raw_uri)
-    project = Project.best_fit_for_file(@projects, uri)
+    project = project_for_file(uri)
     document = TextDocument.new(uri, project, params.text_document.text)
     @opened_documents[raw_uri] = document
   end
@@ -245,8 +245,12 @@ class Crystalline::Workspace
     end
   end
 
+  private def project_for_file(file_uri : URI) : Project?
+    Project.best_fit_for_file(@projects, file_uri)
+  end
+
   private def semantic_cache_key(file_uri : URI) : String
-    if (project = Project.best_fit_for_file(@projects, file_uri)) && (entry_point = project.entry_point?)
+    if (project = project_for_file(file_uri)) && (entry_point = project.entry_point?)
       entry_point.to_s
     else
       file_uri.to_s
@@ -283,7 +287,7 @@ class Crystalline::Workspace
   end
 
   def hover(server : LSP::Server, file_uri : URI, position : LSP::Position)
-    if (text_document = @opened_documents[file_uri.to_s]?) && (query = text_document.project?.try &.lightweight_query)
+    if (text_document = @opened_documents[file_uri.to_s]?) && (query = project_for_file(file_uri).try &.lightweight_query)
       if hover = Crystalline::Lightweight::Hover.hover(fix_source(text_document.contents), position.line, position.character, query)
         LSP::Log.info { "[hover] lightweight hit: #{file_uri.decoded_path}:#{position.line}:#{position.character}" }
         return hover
@@ -445,7 +449,7 @@ class Crystalline::Workspace
 
     trigger_character = completion_context.trigger_character
 
-    if (query = text_document.project?.try &.lightweight_query)
+    if (query = project_for_file(file_uri).try &.lightweight_query)
       if completion_items = Crystalline::Lightweight::Completion.complete(document_lines.join, position.line, completion_context, query)
         unless completion_items.empty?
           LSP::Log.info { "[completion] lightweight hit: #{file_uri.decoded_path}:#{position.line}:#{position.character}" }
