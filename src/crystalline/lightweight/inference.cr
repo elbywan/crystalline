@@ -353,6 +353,9 @@ module Crystalline::Lightweight
 
       if object = node.obj
         object_types = infer_types(object)
+        block_types = infer_block_call_types(node, object_types)
+        return block_types unless block_types.empty?
+
         special_types = infer_special_call_types(node, object_types)
         return special_types unless special_types.empty?
       end
@@ -384,6 +387,50 @@ module Crystalline::Lightweight
         @query.resolve_type_name(node.to_s, namespace: @current_type_name)
       else
         nil
+      end
+    end
+
+    private def infer_block_call_types(node : Crystal::Call, object_types : Array(String)) : Array(String)
+      block = node.block
+      return [] of String unless block
+
+      block_result_types = infer_block_result_types(node, block)
+      return [] of String if block_result_types.empty?
+
+      case node.name
+      when "map", "map_with_index"
+        ["Array(#{join_union_types(block_result_types)})"]
+      when "compact_map"
+        compact_types = block_result_types.reject(&.==("Nil")).uniq
+        compact_types.empty? ? [] of String : ["Array(#{join_union_types(compact_types)})"]
+      when "try"
+        (block_result_types + ["Nil"]).uniq
+      else
+        [] of String
+      end
+    end
+
+    private def infer_block_result_types(node : Crystal::Call, block : Crystal::Block) : Array(String)
+      saved_state = current_state
+      begin
+        seed_block_arg_types(node, block)
+        infer_expression_result_types(block.body)
+      ensure
+        restore_state(saved_state)
+      end
+    end
+
+    private def infer_expression_result_types(node : Crystal::ASTNode) : Array(String)
+      case node
+      when Crystal::Expressions
+        return [] of String if node.expressions.empty?
+
+        node.expressions[0...-1].each do |expression|
+          process_node(expression, apply_cursor_bounds: false)
+        end
+        infer_types(node.expressions.last)
+      else
+        infer_types(node)
       end
     end
 

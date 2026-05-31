@@ -373,6 +373,10 @@ describe Crystalline::Lightweight::Hover do
         def shout : String
           "!"
         end
+
+        def word : String | Nil
+          "hi"
+        end
       end
 
       def demo
@@ -387,6 +391,15 @@ describe Crystalline::Lightweight::Hover do
           memo
           item
         end
+
+        mapped = lookup.values.map { |item| item.word.not_nil! }
+        mapped.first.upcase
+
+        compacted = lookup.values.compact_map { |item| item.word }
+        compacted.first.upcase
+
+        resolved = lookup.values.first?.try { |item| item.word.not_nil! }
+        resolved.not_nil!.upcase
 
         lookup.dig.shout
 
@@ -422,6 +435,24 @@ describe Crystalline::Lightweight::Hover do
     item_hover = Crystalline::Lightweight::Hover.hover(source, item_line_number, item_column_number, query)
     item_hover.should_not be_nil
     hover_value(item_hover.not_nil!).should contain("item : Int32")
+
+    mapped_line_number = lines.index! { |item| item.strip == "mapped.first.upcase" }
+    mapped_column_number = lines[mapped_line_number].rindex("upcase").not_nil! + 2
+    mapped_hover = Crystalline::Lightweight::Hover.hover(source, mapped_line_number, mapped_column_number, query)
+    mapped_hover.should_not be_nil
+    hover_value(mapped_hover.not_nil!).should contain("String#upcase(")
+
+    compacted_line_number = lines.index! { |item| item.strip == "compacted.first.upcase" }
+    compacted_column_number = lines[compacted_line_number].rindex("upcase").not_nil! + 2
+    compacted_hover = Crystalline::Lightweight::Hover.hover(source, compacted_line_number, compacted_column_number, query)
+    compacted_hover.should_not be_nil
+    hover_value(compacted_hover.not_nil!).should contain("String#upcase(")
+
+    resolved_line_number = lines.index! { |item| item.strip == "resolved.not_nil!.upcase" }
+    resolved_column_number = lines[resolved_line_number].rindex("upcase").not_nil! + 2
+    resolved_hover = Crystalline::Lightweight::Hover.hover(source, resolved_line_number, resolved_column_number, query)
+    resolved_hover.should_not be_nil
+    hover_value(resolved_hover.not_nil!).should contain("String#upcase(")
 
     dig_line_number = lines.index! { |item| item.strip == "lookup.dig.shout" }
     dig_column_number = lines[dig_line_number].rindex("shout").not_nil! + 2

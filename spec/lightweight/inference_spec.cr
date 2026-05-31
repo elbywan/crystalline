@@ -265,6 +265,10 @@ describe Crystalline::Lightweight::Inference do
         def shout : String
           "!"
         end
+
+        def word : String | Nil
+          "hi"
+        end
       end
     CRYSTAL
 
@@ -281,6 +285,10 @@ describe Crystalline::Lightweight::Inference do
           memo
           item
         end
+
+        mapped = lookup.values.map { |item| item.word.not_nil! }
+        compacted = lookup.values.compact_map { |item| item.word }
+        resolved = lookup.values.first?.try { |item| item.word.not_nil! }
 
         found = lookup.dig
         current = numbers.find!
@@ -330,6 +338,9 @@ describe Crystalline::Lightweight::Inference do
 
     return_inference.should_not be_nil
     return_inference = return_inference.not_nil!
+    return_inference.types_for("mapped").should eq(["Array(String)"])
+    return_inference.types_for("compacted").should eq(["Array(String)"])
+    return_inference.types_for("resolved").sort.should eq(["Nil", "String"])
     return_inference.types_for("found").should eq(["Greeter", "Nil"])
     return_inference.types_for("current").should eq(["Int32"])
   end
