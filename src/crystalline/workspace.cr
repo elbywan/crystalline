@@ -327,6 +327,10 @@ class Crystalline::Workspace
           LSP::Log.info { "[hover] lightweight hit: #{file_uri.decoded_path}:#{position.line}:#{position.character}" }
           return hover
         end
+
+        LSP::Log.info { "[hover] lightweight miss: #{file_uri.decoded_path}:#{position.line}:#{position.character} reason=#{Crystalline::Lightweight::Hover.diagnose(source, position.line, position.character, query)}" }
+      else
+        LSP::Log.info { "[hover] lightweight miss: #{file_uri.decoded_path}:#{position.line}:#{position.character} reason=no lightweight query" }
       end
     end
 
@@ -415,10 +419,13 @@ class Crystalline::Workspace
   def definitions(server : LSP::Server, file_uri : URI, position : LSP::Position)
     if text_document = @opened_documents[file_uri.to_s]?
       source = fix_source(text_document.contents)
-      if locations = Crystalline::Lightweight::Definitions.definitions(source, file_uri, position.line, position.character, lightweight_query_for(file_uri, source))
+      query = lightweight_query_for(file_uri, source)
+      if locations = Crystalline::Lightweight::Definitions.definitions(source, file_uri, position.line, position.character, query)
         LSP::Log.info { "[definitions] lightweight hit: #{file_uri.decoded_path}:#{position.line}:#{position.character}" }
         return locations
       end
+
+      LSP::Log.info { "[definitions] lightweight miss: #{file_uri.decoded_path}:#{position.line}:#{position.character} reason=#{query ? Crystalline::Lightweight::Definitions.diagnose(source, file_uri, position.line, position.character, query) : "no lightweight query"}" }
     end
 
     unless semantic_cache_allowed?(file_uri)
@@ -500,6 +507,10 @@ class Crystalline::Workspace
           return build_completion_list(completion_items)
         end
       end
+
+      LSP::Log.info { "[completion] lightweight miss: #{file_uri.decoded_path}:#{position.line}:#{position.character} reason=#{Crystalline::Lightweight::Completion.diagnose(document_lines.join, position.line, completion_context, query)}" }
+    else
+      LSP::Log.info { "[completion] lightweight miss: #{file_uri.decoded_path}:#{position.line}:#{position.character} reason=no lightweight query" }
     end
 
     location = Crystal::Location.new(

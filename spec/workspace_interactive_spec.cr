@@ -29,6 +29,10 @@ private def with_workspace_document(source : String)
 end
 
 class Crystalline::Workspace
+  def send_lightweight_query_for_test(file_uri : URI, source : String)
+    lightweight_query_for(file_uri, source)
+  end
+
   def seed_semantic_result(key : String, result : Crystal::Compiler::Result)
     @semantic_cache[key] = result
   end
@@ -450,6 +454,28 @@ describe Crystalline::Workspace do
       hover = workspace.hover(server, uri, position)
       hover.should_not be_nil
       hover.not_nil!.contents.as(LSP::MarkupContent).value.should contain("String#upcase")
+    end
+  end
+
+  it "exposes lightweight miss reasons for dirty-buffer interactive requests" do
+    source = <<-CRYSTAL
+      def demo(items : Array(String))
+        items.unknown_method
+      end
+    CRYSTAL
+
+    with_workspace_document(source) do |_server, workspace, uri|
+      workspace.opened_documents[uri.to_s].not_nil!.update_contents([{source, nil}], version: 1)
+      fixed_source = workspace.opened_documents[uri.to_s].not_nil!.contents
+      lines = fixed_source.lines(chomp: false)
+      line_number = lines.index! { |line| line.includes?("items.unknown_method") }
+      character = lines[line_number].rindex("unknown_method").not_nil! + 2
+      completion_context = Crystalline::CompletionContext.detect(lines[line_number], character, ".").not_nil!
+      query = workspace.send_lightweight_query_for_test(uri, fixed_source).not_nil!
+
+      Crystalline::Lightweight::Hover.diagnose(fixed_source, line_number, character, query).should contain("no lightweight method hover")
+      Crystalline::Lightweight::Definitions.diagnose(fixed_source, uri, line_number, character, query).should contain("no lightweight method definitions")
+      Crystalline::Lightweight::Completion.diagnose(fixed_source, line_number, completion_context, query).should contain("no matching lightweight methods")
     end
   end
 

@@ -9,15 +9,37 @@ module Crystalline::Lightweight
       new(source, line_number, context, query).complete
     end
 
+    def self.diagnose(source : String, line_number : Int32, context : Crystalline::CompletionContext, query : Query) : String
+      new(source, line_number, context, query).diagnose
+    end
+
     def initialize(@source : String, @line_number : Int32, @context : Crystalline::CompletionContext, @query : Query)
     end
 
     def complete : Array(LSP::CompletionItem)?
+      complete_or_reason[0]
+    end
+
+    def diagnose : String
+      complete_or_reason[1]
+    end
+
+    private def complete_or_reason : {Array(LSP::CompletionItem)?, String}
       case @context.trigger_character
       when "."
-        complete_methods
+        items = complete_methods
+        if items
+          {items, items.empty? ? "no matching lightweight methods for receiver '#{receiver_expression}'" : "resolved"}
+        else
+          {nil, "could not resolve method receiver '#{receiver_expression}'"}
+        end
       else
-        complete_context_items
+        items = complete_context_items
+        if items
+          {items, items.empty? ? "no matching context completions" : "resolved"}
+        else
+          {nil, "could not build context completions"}
+        end
       end
     end
 

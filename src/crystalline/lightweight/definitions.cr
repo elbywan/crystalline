@@ -12,37 +12,54 @@ module Crystalline::Lightweight
       new(source, file_uri, line_number, column_number, query).definitions
     end
 
+    def self.diagnose(source : String, file_uri : URI, line_number : Int32, column_number : Int32, query : Query?) : String
+      new(source, file_uri, line_number, column_number, query).diagnose
+    end
+
     def initialize(@source : String, @file_uri : URI, @line_number : Int32, @column_number : Int32, @query : Query?)
     end
 
     def definitions : Array(LSP::Location)?
+      definitions_or_reason[0]
+    rescue Crystal::SyntaxException
+      nil
+    end
+
+    def diagnose : String
+      definitions_or_reason[1]
+    rescue Crystal::SyntaxException
+      "syntax error while parsing definitions"
+    end
+
+    private def definitions_or_reason : {Array(LSP::Location)?, String}
       line = @source.lines(chomp: false)[@line_number]?
-      return unless line
+      return {nil, "no line at cursor"} unless line
 
       span = token_span(line)
-      return unless span
+      return {nil, "no token at cursor"} unless span
 
       start_index, end_index = span
       token = line[start_index, end_index - start_index]?
-      return unless token && !token.empty?
+      return {nil, "empty token at cursor"} unless token && !token.empty?
 
       if start_index > 0 && line[start_index - 1] == '.'
         receiver = Resolver.receiver_from_prefix(line[0, start_index - 1])
-        return unless query = @query
-        return locations_for_method(receiver, token, start_index - 1, query)
+        return {nil, "missing query for method definitions"} unless query = @query
+        definitions = locations_for_method(receiver, token, start_index - 1, query)
+        return {definitions, definitions ? "resolved" : "no lightweight method definitions for receiver '#{receiver}' and method '#{token}'"}
       end
 
       if Resolver.type_name?(token)
-        return locations_for_type(token)
+        definitions = locations_for_type(token)
+        return {definitions, definitions ? "resolved" : "no lightweight type definition for '#{token}'"}
       end
 
       if Resolver.local_name?(token)
-        return locations_for_top_level_method(token)
+        definitions = locations_for_top_level_method(token)
+        return {definitions, definitions ? "resolved" : "no lightweight top-level method definition for '#{token}'"}
       end
 
-      nil
-    rescue Crystal::SyntaxException
-      nil
+      {nil, "unsupported definitions token '#{token}'"}
     end
 
     private def locations_for_method(receiver : String, method_name : String, analysis_column : Int32, query : Query) : Array(LSP::Location)?

@@ -8,6 +8,10 @@ module Crystalline::Lightweight
       new(source, line_number, column_number, query).hover
     end
 
+    def self.diagnose(source : String, line_number : Int32, column_number : Int32, query : Query) : String
+      new(source, line_number, column_number, query).diagnose
+    end
+
     def initialize(@source : String, @line_number : Int32, @column_number : Int32, @query : Query)
     end
 
@@ -15,37 +19,58 @@ module Crystalline::Lightweight
       line = @source.lines(chomp: false)[@line_number]?
       return unless line
 
+      hover_or_reason(line)[0]
+    end
+
+    def diagnose : String
+      line = @source.lines(chomp: false)[@line_number]?
+      return "no line at cursor" unless line
+
+      hover_or_reason(line)[1]
+    end
+
+    private def hover_or_reason(line : String) : {LSP::Hover?, String}
       span = token_span(line)
-      return unless span
+      return {nil, "no token at cursor"} unless span
 
       start_index, end_index = span
       token = line[start_index, end_index - start_index]?
-      return unless token && !token.empty?
+      return {nil, "empty token at cursor"} unless token && !token.empty?
 
       if start_index > 0 && line[start_index - 1] == '.'
         receiver = Resolver.receiver_from_prefix(line[0, start_index - 1])
-        return hover_for_method(receiver, token, start_index - 1) unless receiver.empty?
+        return {nil, "empty method receiver"} if receiver.empty?
+
+        hover = hover_for_method(receiver, token, start_index - 1)
+        return {hover, hover ? "resolved" : "no lightweight method hover for receiver '#{receiver}' and method '#{token}'"}
       end
 
       if token == "self"
-        return hover_for_self
+        hover = hover_for_self
+        return {hover, hover ? "resolved" : "could not infer self type"}
       end
 
       if Resolver.type_name?(token)
-        return hover_for_type(token)
+        hover = hover_for_type(token)
+        return {hover, hover ? "resolved" : "unknown lightweight type '#{token}'"}
       end
 
       if Resolver.instance_var_name?(token)
-        return hover_for_instance_var(token)
+        hover = hover_for_instance_var(token)
+        return {hover, hover ? "resolved" : "could not infer instance var '#{token}'"}
       end
 
       if Resolver.class_var_name?(token)
-        return hover_for_class_var(token)
+        hover = hover_for_class_var(token)
+        return {hover, hover ? "resolved" : "could not infer class var '#{token}'"}
       end
 
       if Resolver.local_name?(token)
-        hover_for_local(token) || hover_for_top_level_method(token)
+        hover = hover_for_local(token) || hover_for_top_level_method(token)
+        return {hover, hover ? "resolved" : "could not infer local or top-level method '#{token}'"}
       end
+
+      {nil, "unsupported hover token '#{token}'"}
     end
 
     private def hover_for_method(receiver : String, method_name : String, analysis_column : Int32) : LSP::Hover?
