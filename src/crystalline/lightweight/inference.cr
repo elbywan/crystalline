@@ -242,7 +242,7 @@ module Crystalline::Lightweight
         return [] of Array(String) if object_types.empty?
         non_nil_types = object_types.reject(&.==("Nil")).uniq
         return non_nil_types.empty? ? [] of Array(String) : [non_nil_types]
-      when "each", "map", "select", "reject", "find", "compact_map"
+      when "each", "map", "select", "reject", "find", "compact_map", "flat_map"
         hash_types = hash_block_argument_types(object_types)
         return hash_types unless hash_types.empty?
         return array_block_argument_types(object_types)
@@ -407,6 +407,11 @@ module Crystalline::Lightweight
       case node.name
       when "map", "map_with_index"
         ["Array(#{join_union_types(block_result_types)})"]
+      when "flat_map"
+        flattened_types = block_result_types.flat_map do |type_name|
+          array_element_types(type_name) || [type_name]
+        end.uniq
+        flattened_types.empty? ? [] of String : ["Array(#{join_union_types(flattened_types)})"]
       when "compact_map"
         compact_types = block_result_types.reject(&.==("Nil")).uniq
         compact_types.empty? ? [] of String : ["Array(#{join_union_types(compact_types)})"]

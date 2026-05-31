@@ -151,7 +151,7 @@ module Crystalline::Lightweight
 
       if element_types = array_element_types(owner_name)
         case method.name
-        when "each", "map", "select", "reject", "find", "compact_map"
+        when "each", "map", "select", "reject", "find", "compact_map", "flat_map"
           contracts << MethodContract.new(kind: MethodContractKind::YieldElement, types: element_types, class_method: method.class_method)
         when "each_with_index", "map_with_index"
           contracts << MethodContract.new(kind: MethodContractKind::YieldElementWithIndex, types: element_types + ["Int32"], class_method: method.class_method)

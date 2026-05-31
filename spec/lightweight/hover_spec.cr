@@ -411,6 +411,9 @@ describe Crystalline::Lightweight::Hover do
         mapped = lookup.values.map { |item| item.word.not_nil! }
         mapped.first.upcase
 
+        flat_mapped = lookup.values.flat_map { |item| [item.word.not_nil!] }
+        flat_mapped.first.upcase
+
         compacted = lookup.values.compact_map { |item| item.word }
         compacted.first.upcase
 
@@ -457,6 +460,12 @@ describe Crystalline::Lightweight::Hover do
     mapped_hover = Crystalline::Lightweight::Hover.hover(source, mapped_line_number, mapped_column_number, query)
     mapped_hover.should_not be_nil
     hover_value(mapped_hover.not_nil!).should contain("String#upcase(")
+
+    flat_mapped_line_number = lines.index! { |item| item.strip == "flat_mapped.first.upcase" }
+    flat_mapped_column_number = lines[flat_mapped_line_number].rindex("upcase").not_nil! + 2
+    flat_mapped_hover = Crystalline::Lightweight::Hover.hover(source, flat_mapped_line_number, flat_mapped_column_number, query)
+    flat_mapped_hover.should_not be_nil
+    hover_value(flat_mapped_hover.not_nil!).should contain("String#upcase(")
 
     compacted_line_number = lines.index! { |item| item.strip == "compacted.first.upcase" }
     compacted_column_number = lines[compacted_line_number].rindex("upcase").not_nil! + 2

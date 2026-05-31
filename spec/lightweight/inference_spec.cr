@@ -312,6 +312,7 @@ describe Crystalline::Lightweight::Inference do
         end
 
         mapped = lookup.values.map { |item| item.word.not_nil! }
+        flat_mapped = lookup.values.flat_map { |item| [item.word.not_nil!] }
         compacted = lookup.values.compact_map { |item| item.word }
         resolved = lookup.values.first?.try { |item| item.word.not_nil! }
 
@@ -364,6 +365,7 @@ describe Crystalline::Lightweight::Inference do
     return_inference.should_not be_nil
     return_inference = return_inference.not_nil!
     return_inference.types_for("mapped").should eq(["Array(String)"])
+    return_inference.types_for("flat_mapped").should eq(["Array(String)"])
     return_inference.types_for("compacted").should eq(["Array(String)"])
     return_inference.types_for("resolved").sort.should eq(["Nil", "String"])
     return_inference.types_for("found").should eq(["Greeter", "Nil"])

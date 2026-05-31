@@ -498,6 +498,9 @@ describe Crystalline::Lightweight::Completion do
         mapped = lookup.values.map { |item| item.word.not_nil! }
         mapped.first.up
 
+        flat_mapped = lookup.values.flat_map { |item| [item.word.not_nil!] }
+        flat_mapped.first.up
+
         compacted = lookup.values.compact_map { |item| item.word }
         compacted.first.up
 
@@ -539,6 +542,11 @@ describe Crystalline::Lightweight::Completion do
     mapped_context = Crystalline::CompletionContext.detect(lines[mapped_line_number], lines[mapped_line_number].size - 1, nil)
     mapped_items = Crystalline::Lightweight::Completion.complete(source, mapped_line_number, mapped_context.not_nil!, query).not_nil!
     mapped_items.map(&.insert_text).compact.should contain("upcase")
+
+    flat_mapped_line_number = lines.index! { |item| item.includes?("flat_mapped.first.up") }
+    flat_mapped_context = Crystalline::CompletionContext.detect(lines[flat_mapped_line_number], lines[flat_mapped_line_number].size - 1, nil)
+    flat_mapped_items = Crystalline::Lightweight::Completion.complete(source, flat_mapped_line_number, flat_mapped_context.not_nil!, query).not_nil!
+    flat_mapped_items.map(&.insert_text).compact.should contain("upcase")
 
     compacted_line_number = lines.index! { |item| item.includes?("compacted.first.up") }
     compacted_context = Crystalline::CompletionContext.detect(lines[compacted_line_number], lines[compacted_line_number].size - 1, nil)
