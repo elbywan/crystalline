@@ -70,4 +70,38 @@ describe Crystalline::Lightweight::Definitions do
     locations.should_not be_nil
     locations.not_nil!.first.range.start.line.should eq(0)
   end
+
+  it "finds method definitions through richer helper chains" do
+    source = <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+      end
+
+      def demo
+        lookup = {"primary" => Greeter.new}
+        lookup.dig.shout
+
+        items = [Greeter.new]
+        items.find!.shout
+      end
+    CRYSTAL
+
+    file_uri = URI.parse("file:///tmp/standalone.cr")
+    query = build_definition_query(source)
+    lines = source.lines(chomp: false)
+
+    dig_line_number = lines.index! { |line| line.strip == "lookup.dig.shout" }
+    dig_character = lines[dig_line_number].rindex("shout").not_nil! + 2
+    dig_locations = Crystalline::Lightweight::Definitions.definitions(source, file_uri, dig_line_number, dig_character, query)
+    dig_locations.should_not be_nil
+    dig_locations.not_nil!.first.range.start.line.should eq(1)
+
+    find_bang_line_number = lines.index! { |line| line.strip == "items.find!.shout" }
+    find_bang_character = lines[find_bang_line_number].rindex("shout").not_nil! + 2
+    find_bang_locations = Crystalline::Lightweight::Definitions.definitions(source, file_uri, find_bang_line_number, find_bang_character, query)
+    find_bang_locations.should_not be_nil
+    find_bang_locations.not_nil!.first.range.start.line.should eq(1)
+  end
 end
