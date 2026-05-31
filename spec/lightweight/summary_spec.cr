@@ -40,6 +40,42 @@ private def build_query_with_summary(source : String)
 end
 
 describe Crystalline::Lightweight::Summary do
+  it "derives method contracts from available method summaries" do
+    query = build_query_with_summary <<-CRYSTAL
+      class Greeter
+      end
+
+      class Wrapper
+        def tap
+          self
+        end
+
+        def current
+          Greeter.new
+        end
+
+        def current?
+          Greeter.new || nil
+        end
+      end
+
+      wrapper = Wrapper.new
+      wrapper.tap
+      wrapper.current
+      wrapper.current?
+    CRYSTAL
+
+    tap_contracts = query.method_contracts_for("Wrapper", "tap")
+    tap_contracts.map(&.kind).should contain(Crystalline::Lightweight::MethodContractKind::YieldSelf)
+    tap_contracts.map(&.kind).should contain(Crystalline::Lightweight::MethodContractKind::PreserveReceiver)
+
+    current_contracts = query.method_contracts_for("Wrapper", "current")
+    current_contracts.map(&.kind).should contain(Crystalline::Lightweight::MethodContractKind::ReturnValue)
+
+    current_nilable_contracts = query.method_contracts_for("Wrapper", "current?")
+    current_nilable_contracts.map(&.kind).should contain(Crystalline::Lightweight::MethodContractKind::ReturnValueOrNil)
+  end
+
   it "captures inferred return types for typed defs" do
     query = build_query_with_summary <<-CRYSTAL
       class Greeter

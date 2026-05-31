@@ -1,7 +1,24 @@
 module Crystalline::Lightweight
+  enum MethodContractKind
+    YieldSelf
+    YieldElement
+    YieldElementWithIndex
+    PreserveReceiver
+    ReturnElement
+    ReturnElementOrNil
+    ReturnValue
+    ReturnValueOrNil
+  end
+
+  record MethodContract,
+    kind : MethodContractKind,
+    types : Array(String) = [] of String,
+    class_method : Bool = false
+
   class SummaryType
     getter name : String
     getter methods = [] of MethodInfo
+    getter method_contracts = {} of String => Array(MethodContract)
     getter instance_vars = {} of String => Array(String)
     getter class_vars = {} of String => Array(String)
 
@@ -99,6 +116,57 @@ module Crystalline::Lightweight
       else
         summary_type.methods << method
       end
+
+      contracts = summary_type.method_contracts[method.name] ||= [] of MethodContract
+      infer_contracts(owner_name, method).each do |contract|
+        contracts << contract unless contracts.includes?(contract)
+      end
+    end
+
+    private def infer_contracts(owner_name : String, method : MethodInfo) : Array(MethodContract)
+      contracts = [] of MethodContract
+      return contracts unless return_type = method.return_type
+
+      normalized_return_types = expand_type_names(return_type)
+
+      if normalized_return_types == [owner_name]
+        contracts << MethodContract.new(kind: MethodContractKind::PreserveReceiver, types: [owner_name], class_method: method.class_method)
+      elsif normalized_return_types.sort == [owner_name, "Nil"].sort
+        contracts << MethodContract.new(kind: MethodContractKind::ReturnValueOrNil, types: [owner_name], class_method: method.class_method)
+      elsif normalized_return_types.includes?("Nil")
+        contracts << MethodContract.new(kind: MethodContractKind::ReturnValueOrNil, types: normalized_return_types.reject(&.==("Nil")), class_method: method.class_method)
+      else
+        contracts << MethodContract.new(kind: MethodContractKind::ReturnValue, types: normalized_return_types, class_method: method.class_method)
+      end
+
+      if element_types = array_element_types(owner_name)
+        case method.name
+        when "each", "map", "select", "reject", "compact_map"
+          contracts << MethodContract.new(kind: MethodContractKind::YieldElement, types: element_types, class_method: method.class_method)
+        when "each_with_index", "map_with_index"
+          contracts << MethodContract.new(kind: MethodContractKind::YieldElementWithIndex, types: element_types + ["Int32"], class_method: method.class_method)
+        end
+
+        if normalized_return_types.sort == element_types.sort
+          contracts << MethodContract.new(kind: MethodContractKind::ReturnElement, types: element_types, class_method: method.class_method)
+        elsif normalized_return_types.sort == (element_types + ["Nil"]).uniq.sort
+          contracts << MethodContract.new(kind: MethodContractKind::ReturnElementOrNil, types: element_types, class_method: method.class_method)
+        end
+      end
+
+      if value_types = hash_value_types(owner_name)
+        if normalized_return_types.sort == value_types.sort
+          contracts << MethodContract.new(kind: MethodContractKind::ReturnValue, types: value_types, class_method: method.class_method)
+        elsif normalized_return_types.sort == (value_types + ["Nil"]).uniq.sort
+          contracts << MethodContract.new(kind: MethodContractKind::ReturnValueOrNil, types: value_types, class_method: method.class_method)
+        end
+      end
+
+      if method.name == "tap" && normalized_return_types == [owner_name]
+        contracts << MethodContract.new(kind: MethodContractKind::YieldSelf, types: [owner_name], class_method: method.class_method)
+      end
+
+      contracts
     end
 
     private def owner_info(type : Crystal::Type) : {String, Bool}
@@ -111,6 +179,48 @@ module Crystalline::Lightweight
 
     private def ensure_type(name : String) : SummaryType
       @types[name] ||= SummaryType.new(name)
+    end
+
+    private def array_element_types(type_name : String) : Array(String)?
+      generic_type_arguments(type_name, "Array", 1).try { |parts| expand_type_names(parts[0]) }
+    end
+
+    private def hash_value_types(type_name : String) : Array(String)?
+      generic_type_arguments(type_name, "Hash", 2).try { |parts| expand_type_names(parts[1]) }
+    end
+
+    private def generic_type_arguments(type_name : String, generic_name : String, arity : Int32) : Array(String)?
+      normalized = type_name.strip
+      prefix = "#{generic_name}("
+      return unless normalized.starts_with?(prefix) && normalized.ends_with?(')')
+
+      parts = split_top_level(normalized[prefix.size...-1])
+      return unless parts.size == arity
+
+      parts
+    end
+
+    private def split_top_level(value : String) : Array(String)
+      parts = [] of String
+      depth = 0
+      start = 0
+
+      value.each_char_with_index do |char, index|
+        case char
+        when '('
+          depth += 1
+        when ')'
+          depth -= 1 if depth > 0
+        when ','
+          if depth == 0
+            parts << value[start...index].strip
+            start = index + 1
+          end
+        end
+      end
+
+      parts << value[start..].to_s.strip
+      parts.reject(&.empty?)
     end
 
     private def expand_type_names(type_name : String) : Array(String)

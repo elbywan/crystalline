@@ -190,6 +190,8 @@ module Crystalline::Lightweight
 
     private def block_argument_types(node : Crystal::Call) : Array(Array(String))
       object_types = node.obj.try { |object| infer_types(object) } || [] of String
+      summary_types = object_types.flat_map { |type_name| summary_block_argument_types(type_name, node.name) }
+      return summary_types unless summary_types.empty?
 
       case node.name
       when "try", "tap"
@@ -205,6 +207,25 @@ module Crystalline::Lightweight
       else
         [] of Array(String)
       end
+    end
+
+    private def summary_block_argument_types(type_name : String, method_name : String) : Array(Array(String))
+      contracts = @query.method_contracts_for(type_name, method_name)
+      return [] of Array(String) if contracts.empty?
+
+      block_types = [] of Array(String)
+      contracts.each do |contract|
+        case contract.kind
+        when .yield_self?, .yield_element?
+          block_types << contract.types unless contract.types.empty?
+        when .yield_element_with_index?
+          if contract.types.size >= 2
+            block_types << contract.types[0...-1]
+            block_types << [contract.types.last]
+          end
+        end
+      end
+      block_types
     end
 
     private def array_block_argument_types(object_types : Array(String)) : Array(Array(String))
