@@ -125,6 +125,8 @@ module Crystalline::Lightweight
         infer_array_literal_types(node)
       when Crystal::HashLiteral
         infer_hash_literal_types(node)
+      when Crystal::NamedTupleLiteral
+        infer_named_tuple_literal_types(node)
       when Crystal::Call
         infer_call_types(node)
       when Crystal::Or
@@ -319,6 +321,17 @@ module Crystalline::Lightweight
       ["Hash(#{join_union_types(key_types)}, #{join_union_types(value_types)})"]
     end
 
+    private def infer_named_tuple_literal_types(node : Crystal::NamedTupleLiteral) : Array(String)
+      parts = node.entries.map do |entry|
+        value_types = infer_types(entry.value)
+        next unless value_types.present?
+        "#{entry.key}: #{join_union_types(value_types)}"
+      end.compact
+      return ["NamedTuple"] if parts.empty?
+
+      ["NamedTuple(#{parts.join(", ")})"]
+    end
+
     private def container_call_types(type_name : String, method_name : String) : Array(String)
       if element_types = array_element_types(type_name)
         case method_name
@@ -329,6 +342,19 @@ module Crystalline::Lightweight
         end
       end
 
+      if tuple_types = tuple_element_types(type_name)
+        case method_name
+        when "first"
+          return tuple_types.first? || [] of String
+        when "last"
+          return tuple_types.last? || [] of String
+        when "first?"
+          return ((tuple_types.first? || [] of String) + ["Nil"]).uniq
+        when "last?"
+          return ((tuple_types.last? || [] of String) + ["Nil"]).uniq
+        end
+      end
+
       if value_types = hash_value_types(type_name)
         case method_name
         when "[]", "fetch"
@@ -336,6 +362,10 @@ module Crystalline::Lightweight
         when "[]?"
           return (value_types + ["Nil"]).uniq
         end
+      end
+
+      if value_types = named_tuple_value_types(type_name, method_name)
+        return value_types
       end
 
       [] of String
@@ -357,6 +387,20 @@ module Crystalline::Lightweight
       normalized = type_name.strip
       if normalized.starts_with?('{') && normalized.ends_with?('}')
         return split_top_level(normalized[1...-1]).map { |part| expand_type_names(part) }
+      end
+
+      nil
+    end
+
+    private def named_tuple_value_types(type_name : String, field_name : String) : Array(String)?
+      normalized = type_name.strip
+      prefix = "NamedTuple("
+      return unless normalized.starts_with?(prefix) && normalized.ends_with?(')')
+
+      split_top_level(normalized[prefix.size...-1]).each do |part|
+        key, value = part.split(":", 2)
+        next unless value
+        return expand_type_names(value.strip) if key.strip == field_name
       end
 
       nil

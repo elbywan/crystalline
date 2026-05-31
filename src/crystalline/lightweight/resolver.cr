@@ -124,7 +124,11 @@ module Crystalline::Lightweight
     end
 
     private def receiver_type_known?(type_name : String, query : Query) : Bool
-      query.find_type(type_name) != nil || !special_return_type_names(type_name, "first", query).empty? || !special_return_type_names(type_name, "[]", query).empty?
+      query.find_type(type_name) != nil ||
+        array_element_types(type_name) != nil ||
+        hash_value_types(type_name) != nil ||
+        tuple_element_types(type_name) != nil ||
+        named_tuple_known?(type_name)
     end
 
     private def special_return_type_names(type_name : String, method_name : String, query : Query) : Array(String)
@@ -134,18 +138,38 @@ module Crystalline::Lightweight
       when "first", "last", "[]"
         if element_types = array_element_types(type_name)
           return element_types.select { |item| receiver_type_known?(item, query) || query.find_type(item) != nil }
+        elsif tuple_types = tuple_element_types(type_name)
+          if method_name == "first"
+            return tuple_types.first? || [] of String
+          elsif method_name == "last"
+            return tuple_types.last? || [] of String
+          end
+          return tuple_types.flatten.uniq
         elsif value_types = hash_value_types(type_name)
           return value_types.select { |item| receiver_type_known?(item, query) || query.find_type(item) != nil }
         end
       when "first?", "last?", "[]?"
         if element_types = array_element_types(type_name)
           return (element_types + ["Nil"]).uniq
+        elsif tuple_types = tuple_element_types(type_name)
+          selected = if method_name == "first?"
+            tuple_types.first? || [] of String
+          elsif method_name == "last?"
+            tuple_types.last? || [] of String
+          else
+            tuple_types.flatten.uniq
+          end
+          return (selected + ["Nil"]).uniq
         elsif value_types = hash_value_types(type_name)
           return (value_types + ["Nil"]).uniq
         end
       when "fetch"
         if value_types = hash_value_types(type_name)
           return value_types
+        end
+      else
+        if value_types = named_tuple_value_types(type_name, method_name)
+          return value_types.select { |item| receiver_type_known?(item, query) || query.find_type(item) != nil }
         end
       end
 
@@ -172,13 +196,36 @@ module Crystalline::Lightweight
       generic_type_arguments(type_name, "Hash", 2).try { |parts| normalize_type_names(parts[1]) }
     end
 
-    private def generic_type_arguments(type_name : String, generic_name : String, arity : Int32) : Array(String)?
+    private def tuple_element_types(type_name : String) : Array(Array(String))?
+      generic_type_arguments(type_name, "Tuple", nil).try { |parts| parts.map { |part| normalize_type_names(part) } }
+    end
+
+    private def named_tuple_value_types(type_name : String, field_name : String) : Array(String)?
+      normalized = type_name.strip
+      prefix = "NamedTuple("
+      return unless normalized.starts_with?(prefix) && normalized.ends_with?(')')
+
+      split_top_level(normalized[prefix.size...-1]).each do |part|
+        key, value = part.split(":", 2)
+        next unless value
+        return normalize_type_names(value.strip) if key.strip == field_name
+      end
+
+      nil
+    end
+
+    private def named_tuple_known?(type_name : String) : Bool
+      normalized = type_name.strip
+      normalized.starts_with?("NamedTuple(") && normalized.ends_with?(')')
+    end
+
+    private def generic_type_arguments(type_name : String, generic_name : String, arity : Int32?) : Array(String)?
       normalized = type_name.strip
       prefix = "#{generic_name}("
       return unless normalized.starts_with?(prefix) && normalized.ends_with?(')')
 
       parts = split_top_level(normalized[prefix.size...-1])
-      return unless parts.size == arity
+      return unless arity.nil? || parts.size == arity
 
       parts
     end

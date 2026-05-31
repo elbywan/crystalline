@@ -303,4 +303,37 @@ describe Crystalline::Lightweight::Hover do
     value_hover.should_not be_nil
     hover_value(value_hover.not_nil!).should contain("value : Greeter")
   end
+
+  it "hovers tuple and named tuple derived receivers" do
+    source = <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+      end
+
+      def demo
+        pair = {Greeter.new, 1}
+        pair.first.shout
+
+        named = {greeter: Greeter.new}
+        named.greeter.shout
+      end
+    CRYSTAL
+
+    query = build_lightweight_hover_query(source)
+    lines = source.lines(chomp: false)
+
+    tuple_line_number = lines.index! { |item| item.strip == "pair.first.shout" }
+    tuple_column_number = lines[tuple_line_number].rindex("shout").not_nil! + 2
+    tuple_hover = Crystalline::Lightweight::Hover.hover(source, tuple_line_number, tuple_column_number, query)
+    tuple_hover.should_not be_nil
+    hover_value(tuple_hover.not_nil!).should contain("Greeter#shout() : String")
+
+    named_line_number = lines.index! { |item| item.strip == "named.greeter.shout" }
+    named_column_number = lines[named_line_number].rindex("shout").not_nil! + 2
+    named_hover = Crystalline::Lightweight::Hover.hover(source, named_line_number, named_column_number, query)
+    named_hover.should_not be_nil
+    hover_value(named_hover.not_nil!).should contain("Greeter#shout() : String")
+  end
 end

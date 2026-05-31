@@ -404,4 +404,35 @@ describe Crystalline::Lightweight::Completion do
     value_items = Crystalline::Lightweight::Completion.complete(source, value_line_number, value_context.not_nil!, query).not_nil!
     value_items.map(&.insert_text).compact.should contain("shout")
   end
+
+  it "completes tuple and named tuple derived receivers" do
+    source = <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+      end
+
+      def demo
+        pair = {Greeter.new, 1}
+        pair.first.sh
+
+        named = {greeter: Greeter.new}
+        named.greeter.sh
+      end
+    CRYSTAL
+
+    query = build_lightweight_query(source)
+    lines = source.lines(chomp: false)
+
+    tuple_line_number = lines.index! { |item| item.includes?("pair.first.sh") }
+    tuple_context = Crystalline::CompletionContext.detect(lines[tuple_line_number], lines[tuple_line_number].size - 1, nil)
+    tuple_items = Crystalline::Lightweight::Completion.complete(source, tuple_line_number, tuple_context.not_nil!, query).not_nil!
+    tuple_items.map(&.insert_text).compact.should contain("shout")
+
+    named_line_number = lines.index! { |item| item.includes?("named.greeter.sh") }
+    named_context = Crystalline::CompletionContext.detect(lines[named_line_number], lines[named_line_number].size - 1, nil)
+    named_items = Crystalline::Lightweight::Completion.complete(source, named_line_number, named_context.not_nil!, query).not_nil!
+    named_items.map(&.insert_text).compact.should contain("shout")
+  end
 end
