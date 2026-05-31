@@ -32,6 +32,14 @@ class Crystalline::Workspace
   def seed_semantic_result(key : String, result : Crystal::Compiler::Result)
     @semantic_cache[key] = result
   end
+
+  def seed_result_cache(key : String, result : Crystal::Compiler::Result?)
+    @result_cache.set(key, result)
+  end
+
+  def result_cache_invalidated?(key : String) : Bool
+    @result_cache.invalidated?(key)
+  end
 end
 
 private def mark_workspace_document_dirty(document : Crystalline::TextDocument, contents : String, version : Int32 = 1)
@@ -438,6 +446,42 @@ describe Crystalline::Workspace do
       hover = workspace.hover(server, uri, position)
       hover.should_not be_nil
       hover.not_nil!.contents.as(LSP::MarkupContent).value.should contain("String#upcase")
+    end
+  end
+
+  it "invalidates the project entry cache on save" do
+    source = <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+      end
+    CRYSTAL
+
+    with_workspace_document(source) do |server, workspace, uri|
+      project = workspace.projects.first?.not_nil!
+      entry_point = project.entry_point?.not_nil!
+      result = Crystalline::Analysis.compile(
+        server,
+        entry_point,
+        lib_path: project.default_lib_path,
+        ignore_diagnostics: true,
+        wants_doc: true,
+        compiler_flags: project.flags,
+      )
+      result.should_not be_nil
+
+      workspace.seed_result_cache(entry_point.to_s, result)
+      workspace.result_cache_invalidated?(entry_point.to_s).should be_false
+
+      workspace.save_document(
+        server,
+        LSP::DidSaveTextDocumentParams.new(
+          text_document: LSP::TextDocumentIdentifier.new(uri: uri.to_s),
+        ),
+      )
+
+      workspace.result_cache_invalidated?(entry_point.to_s).should be_true
     end
   end
 end

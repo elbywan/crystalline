@@ -70,7 +70,12 @@ class Crystalline::Workspace
 
   def save_document(server : LSP::Server, params : LSP::DidSaveTextDocumentParams)
     file_uri = params.text_document.uri
-    @opened_documents[file_uri]?.try &.mark_saved
+    @opened_documents[file_uri]?.try { |document|
+      document.mark_saved
+      document.project?.try(&.entry_point?).try { |entry|
+        @result_cache.invalidate(entry.to_s)
+      }
+    }
     @result_cache.invalidate(file_uri)
     invalidate_semantic_cache(URI.parse(file_uri))
   end
