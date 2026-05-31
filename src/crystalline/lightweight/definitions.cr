@@ -66,6 +66,12 @@ module Crystalline::Lightweight
       type_names, class_method = Resolver.receiver_types(@source, @line_number, analysis_column, receiver, query)
       return if type_names.empty?
 
+      method_infos = type_names.flat_map do |type_name|
+        query.methods_for(type_name, class_method: class_method).select(&.name.==(method_name))
+      end
+      locations = build_method_locations(method_infos)
+      return locations if locations
+
       matches = def_infos.select do |info|
         type_names.includes?(info.owner) && info.class_method == class_method && info.definition.name == method_name
       end
@@ -80,10 +86,33 @@ module Crystalline::Lightweight
     end
 
     private def locations_for_top_level_method(method_name : String) : Array(LSP::Location)?
+      if query = @query
+        method_locations = build_method_locations(query.top_level_methods.select(&.name.==(method_name)))
+        return method_locations if method_locations
+      end
+
       matches = def_infos.select do |info|
         info.owner.nil? && info.definition.name == method_name
       end
       build_locations(matches.map(&.definition))
+    end
+
+    private def build_method_locations(methods : Array(MethodInfo)) : Array(LSP::Location)?
+      locations = methods.compact_map do |method|
+        start_location = method.name_location || method.location
+        next unless start_location
+
+        name_size = method.name_size.zero? ? method.name.size : method.name_size
+        end_location = Crystal::Location.new(
+          start_location.filename,
+          start_location.line_number,
+          start_location.column_number + name_size - 1,
+        )
+
+        lsp_location(start_location, end_location)
+      end
+
+      locations.empty? ? nil : locations
     end
 
     private def build_locations(definitions : Array(Crystal::Def)) : Array(LSP::Location)?

@@ -227,6 +227,9 @@ module Crystalline::Lightweight
         class_method: method.class_method,
         macro: method.macro,
         doc: method.doc,
+        location: method.location,
+        name_location: method.name_location,
+        name_size: method.name_size,
       )
     end
 
@@ -387,6 +390,9 @@ module Crystalline::Lightweight
             class_method: existing.class_method,
             macro: existing.macro,
             doc: existing.doc || summary_method.doc,
+            location: existing.location || summary_method.location,
+            name_location: existing.name_location || summary_method.name_location,
+            name_size: existing.name_size.zero? ? summary_method.name_size : existing.name_size,
           )
         else
           merged << summary_method

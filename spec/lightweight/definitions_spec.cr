@@ -9,6 +9,27 @@ private def build_definition_query(source : String)
   Crystalline::Lightweight::Query.new(index)
 end
 
+private def build_program_definition_query(source : String)
+  path = File.join(Dir.tempdir, "crystalline-lightweight-definitions-#{Random::Secure.hex(8)}.cr")
+  File.write(path, source)
+
+  begin
+    Crystalline::EnvironmentConfig.run
+    server = LSP::Server.new(IO::Memory.new, IO::Memory.new)
+    result = Crystalline::Analysis.compile(
+      server,
+      URI.parse("file://#{path}"),
+      lib_path: File.join(Dir.current, "lib"),
+      top_level: true,
+      ignore_diagnostics: true,
+    )
+    raise "expected top-level semantic result" unless result
+    Crystalline::Lightweight::Query.new(Crystalline::Lightweight::Index.from_program(result.program))
+  ensure
+    File.delete(path) if File.exists?(path)
+  end
+end
+
 describe Crystalline::Lightweight::Definitions do
   it "finds type definitions in standalone syntax-only files" do
     source = <<-CRYSTAL
@@ -85,11 +106,12 @@ describe Crystalline::Lightweight::Definitions do
 
         items = [Greeter.new]
         items.find!.shout
+        items.compact_map
       end
     CRYSTAL
 
     file_uri = URI.parse("file:///tmp/standalone.cr")
-    query = build_definition_query(source)
+    query = build_program_definition_query(source)
     lines = source.lines(chomp: false)
 
     dig_line_number = lines.index! { |line| line.strip == "lookup.dig.shout" }
@@ -103,5 +125,10 @@ describe Crystalline::Lightweight::Definitions do
     find_bang_locations = Crystalline::Lightweight::Definitions.definitions(source, file_uri, find_bang_line_number, find_bang_character, query)
     find_bang_locations.should_not be_nil
     find_bang_locations.not_nil!.first.range.start.line.should eq(1)
+
+    inherited_line_number = lines.index! { |line| line.strip == "items.compact_map" }
+    inherited_character = lines[inherited_line_number].rindex("compact_map").not_nil! + 2
+    inherited_locations = Crystalline::Lightweight::Definitions.definitions(source, file_uri, inherited_line_number, inherited_character, query)
+    inherited_locations.should_not be_nil
   end
 end

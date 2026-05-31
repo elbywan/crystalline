@@ -110,6 +110,9 @@ module Crystalline::Lightweight
         return_type: return_type,
         class_method: class_method,
         doc: typed_def.doc,
+        location: typed_def.location,
+        name_location: typed_def.name_location,
+        name_size: typed_def.name.to_s.size,
       )
 
       existing_index = summary_type.methods.index do |existing|

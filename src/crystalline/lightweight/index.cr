@@ -21,7 +21,10 @@ module Crystalline::Lightweight
     return_type : String?,
     class_method : Bool = false,
     macro : Bool = false,
-    doc : String? = nil
+    doc : String? = nil,
+    location : Crystal::Location? = nil,
+    name_location : Crystal::Location? = nil,
+    name_size : Int32 = 0
 
   class TypeInfo
     getter name : String
@@ -215,6 +218,9 @@ module Crystalline::Lightweight
         class_method: class_method,
         macro: is_macro,
         doc: definition.doc,
+        location: definition.location,
+        name_location: definition.responds_to?(:name_location) ? definition.name_location : nil,
+        name_size: definition.name.to_s.size,
       )
     end
 
