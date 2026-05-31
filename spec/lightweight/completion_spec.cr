@@ -364,4 +364,44 @@ describe Crystalline::Lightweight::Completion do
     items = Crystalline::Lightweight::Completion.complete(source, line_number, context.not_nil!, query).not_nil!
     items.map(&.insert_text).compact.should contain("method1")
   end
+
+  it "completes block arguments for iterator helpers" do
+    source = <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+      end
+
+      def demo
+        items = [Greeter.new]
+        items.each_with_index do |item, index|
+          item.sh
+          index.to_
+        end
+
+        Greeter.new.tap do |value|
+          value.sh
+        end
+      end
+    CRYSTAL
+
+    query = build_lightweight_query(source)
+    lines = source.lines(chomp: false)
+
+    item_line_number = lines.index! { |item| item.includes?("item.sh") }
+    item_context = Crystalline::CompletionContext.detect(lines[item_line_number], lines[item_line_number].size - 1, nil)
+    item_items = Crystalline::Lightweight::Completion.complete(source, item_line_number, item_context.not_nil!, query).not_nil!
+    item_items.map(&.insert_text).compact.should contain("shout")
+
+    index_line_number = lines.index! { |item| item.includes?("index.to_") }
+    index_context = Crystalline::CompletionContext.detect(lines[index_line_number], lines[index_line_number].size - 1, nil)
+    index_items = Crystalline::Lightweight::Completion.complete(source, index_line_number, index_context.not_nil!, query).not_nil!
+    index_items.map(&.insert_text).compact.should contain("to_i")
+
+    value_line_number = lines.index! { |item| item.includes?("value.sh") }
+    value_context = Crystalline::CompletionContext.detect(lines[value_line_number], lines[value_line_number].size - 1, nil)
+    value_items = Crystalline::Lightweight::Completion.complete(source, value_line_number, value_context.not_nil!, query).not_nil!
+    value_items.map(&.insert_text).compact.should contain("shout")
+  end
 end

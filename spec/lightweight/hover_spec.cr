@@ -260,4 +260,47 @@ describe Crystalline::Lightweight::Hover do
     hover.should_not be_nil
     hover_value(hover.not_nil!).should contain("Clazz#method1(num : Int32)")
   end
+
+  it "hovers block arguments inferred from helpers" do
+    source = <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+      end
+
+      def demo
+        items = [Greeter.new]
+        items.each_with_index do |item, index|
+          item
+          index
+        end
+
+        Greeter.new.tap do |value|
+          value
+        end
+      end
+    CRYSTAL
+
+    query = build_lightweight_hover_query(source)
+    lines = source.lines(chomp: false)
+
+    item_line_number = lines.index! { |item| item.strip == "item" }
+    item_column_number = lines[item_line_number].index("item").not_nil! + 1
+    item_hover = Crystalline::Lightweight::Hover.hover(source, item_line_number, item_column_number, query)
+    item_hover.should_not be_nil
+    hover_value(item_hover.not_nil!).should contain("item : Greeter")
+
+    index_line_number = lines.index! { |item| item.strip == "index" }
+    index_column_number = lines[index_line_number].index("index").not_nil! + 1
+    index_hover = Crystalline::Lightweight::Hover.hover(source, index_line_number, index_column_number, query)
+    index_hover.should_not be_nil
+    hover_value(index_hover.not_nil!).should contain("index : Int32")
+
+    value_line_number = lines.index! { |item| item.strip == "value" }
+    value_column_number = lines[value_line_number].index("value").not_nil! + 1
+    value_hover = Crystalline::Lightweight::Hover.hover(source, value_line_number, value_column_number, query)
+    value_hover.should_not be_nil
+    hover_value(value_hover.not_nil!).should contain("value : Greeter")
+  end
 end

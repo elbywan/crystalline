@@ -190,17 +190,26 @@ module Crystalline::Lightweight
       object_types = node.obj.try { |object| infer_types(object) } || [] of String
 
       case node.name
-      when "try"
+      when "try", "tap"
         return [] of Array(String) if object_types.empty?
         non_nil_types = object_types.reject(&.==("Nil")).uniq
         return non_nil_types.empty? ? [] of Array(String) : [non_nil_types]
-      when "each", "map", "select"
-        return [] of Array(String) if object_types.empty?
-        element_types = object_types.flat_map { |type_name| array_element_types(type_name) || [] of String }.uniq
-        return element_types.empty? ? [] of Array(String) : [element_types]
+      when "each", "map", "select", "reject", "find", "compact_map"
+        return array_block_argument_types(object_types)
+      when "each_with_index", "map_with_index"
+        element_types = array_block_argument_types(object_types).first?
+        return [] of Array(String) unless element_types
+        [element_types, ["Int32"]]
       else
         [] of Array(String)
       end
+    end
+
+    private def array_block_argument_types(object_types : Array(String)) : Array(Array(String))
+      return [] of Array(String) if object_types.empty?
+
+      element_types = object_types.flat_map { |type_name| array_element_types(type_name) || [] of String }.uniq
+      element_types.empty? ? [] of Array(String) : [element_types]
     end
 
     private def destructured_value_types(node : Crystal::ASTNode) : Array(Array(String))
