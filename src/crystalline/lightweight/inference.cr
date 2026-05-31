@@ -78,6 +78,14 @@ module Crystalline::Lightweight
         when Crystal::ClassVar
           @class_var_types[target.name] = types
         end
+      when Crystal::MultiAssign
+        return unless !apply_cursor_bounds || before_cursor?(node)
+
+        assign_multi_types(node)
+      when Crystal::Call
+        return unless !apply_cursor_bounds || before_cursor?(node) || node.block.try { |block| contains_cursor?(block) }
+
+        process_call(node, apply_cursor_bounds: apply_cursor_bounds)
       when Crystal::If
         return unless !apply_cursor_bounds || starts_before_or_at_cursor?(node)
 
@@ -123,8 +131,90 @@ module Crystalline::Lightweight
         infer_or_types(node)
       when Crystal::And
         infer_and_types(node)
+      when Crystal::TupleLiteral
+        ["Tuple(#{join_union_types(node.elements.flat_map { |element| infer_types(element) })})"]
       else
         [] of String
+      end
+    end
+
+    private def assign_multi_types(node : Crystal::MultiAssign)
+      value_types = if node.values.size == 1
+        destructured_value_types(node.values.first)
+      else
+        node.values.flat_map { |value| [infer_types(value)] }
+      end
+
+      node.targets.each_with_index do |target, index|
+        next unless types = value_types[index]?
+        next if types.empty?
+
+        case target
+        when Crystal::Var
+          @local_types[target.name] = types
+        when Crystal::InstanceVar
+          @instance_var_types[target.name] = types
+        when Crystal::ClassVar
+          @class_var_types[target.name] = types
+        end
+      end
+    end
+
+    private def process_call(node : Crystal::Call, *, apply_cursor_bounds : Bool)
+      block = node.block
+      return unless block
+      return unless contains_cursor?(block)
+
+      saved_local_types = @local_types.dup
+      begin
+        seed_block_arg_types(node, block)
+        process_node(block.body, apply_cursor_bounds: apply_cursor_bounds)
+      ensure
+        @local_types = saved_local_types.merge(@local_types) { |_, old_value, new_value| (old_value + new_value).uniq }
+      end
+    end
+
+    private def seed_block_arg_types(node : Crystal::Call, block : Crystal::Block)
+      return if block.args.empty?
+
+      arg_types = block_argument_types(node)
+      return if arg_types.empty?
+
+      block.args.each_with_index do |arg, index|
+        types = arg_types[index]? || [] of String
+        @local_types[arg.name] = types unless types.empty?
+      end
+    end
+
+    private def block_argument_types(node : Crystal::Call) : Array(Array(String))
+      object_types = node.obj.try { |object| infer_types(object) } || [] of String
+
+      case node.name
+      when "try"
+        return [] of Array(String) if object_types.empty?
+        non_nil_types = object_types.reject(&.==("Nil")).uniq
+        return non_nil_types.empty? ? [] of Array(String) : [non_nil_types]
+      when "each", "map", "select"
+        return [] of Array(String) if object_types.empty?
+        element_types = object_types.flat_map { |type_name| array_element_types(type_name) || [] of String }.uniq
+        return element_types.empty? ? [] of Array(String) : [element_types]
+      else
+        [] of Array(String)
+      end
+    end
+
+    private def destructured_value_types(node : Crystal::ASTNode) : Array(Array(String))
+      case node
+      when Crystal::TupleLiteral
+        node.elements.map { |element| infer_types(element) }
+      else
+        infer_types(node).flat_map do |type_name|
+          if tuple_types = tuple_element_types(type_name)
+            tuple_types
+          else
+            [] of Array(String)
+          end
+        end
       end
     end
 
@@ -250,13 +340,26 @@ module Crystalline::Lightweight
       generic_type_arguments(type_name, "Hash", 2).try { |parts| expand_type_names(parts[1]) }
     end
 
-    private def generic_type_arguments(type_name : String, generic_name : String, arity : Int32) : Array(String)?
+    private def tuple_element_types(type_name : String) : Array(Array(String))?
+      if parts = generic_type_arguments(type_name, "Tuple", nil)
+        return parts.map { |part| expand_type_names(part) }
+      end
+
+      normalized = type_name.strip
+      if normalized.starts_with?('{') && normalized.ends_with?('}')
+        return split_top_level(normalized[1...-1]).map { |part| expand_type_names(part) }
+      end
+
+      nil
+    end
+
+    private def generic_type_arguments(type_name : String, generic_name : String, arity : Int32?) : Array(String)?
       normalized = type_name.strip
       prefix = "#{generic_name}("
       return unless normalized.starts_with?(prefix) && normalized.ends_with?(')')
 
       parts = split_top_level(normalized[prefix.size...-1])
-      return unless parts.size == arity
+      return unless arity.nil? || parts.size == arity
 
       parts
     end

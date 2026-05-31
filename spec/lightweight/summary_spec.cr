@@ -104,4 +104,42 @@ describe Crystalline::Lightweight::Summary do
     items.should_not be_nil
     items.not_nil!.map(&.insert_text).compact.should contain("shout")
   end
+
+  it "uses semantic summaries for tuple destructuring and try block inference" do
+    source = <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+      end
+
+      class CursorVisitor
+        def process
+          { [Greeter.new], nil }
+        end
+      end
+
+      CursorVisitor.new.process
+    CRYSTAL
+
+    query = build_query_with_summary(source)
+
+    completion_source = source + <<-CRYSTAL
+
+      def demo
+        nodes, context = CursorVisitor.new.process
+        nodes.last?.try { |node| node.sh }
+      end
+    CRYSTAL
+
+    lines = completion_source.lines(chomp: false)
+    line_number = lines.index! { |line| line.includes?("node.sh") }
+    cursor = lines[line_number].index("node.sh").not_nil! + "node.sh".size
+    context = Crystalline::CompletionContext.detect(lines[line_number], cursor, nil)
+    context.should_not be_nil
+
+    items = Crystalline::Lightweight::Completion.complete(completion_source, line_number, context.not_nil!, query)
+    items.should_not be_nil
+    items.not_nil!.map(&.insert_text).compact.should contain("shout")
+  end
 end
