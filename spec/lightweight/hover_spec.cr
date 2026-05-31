@@ -202,4 +202,35 @@ describe Crystalline::Lightweight::Hover do
     ivar_method_hover.should_not be_nil
     hover_value(ivar_method_hover.not_nil!).should contain("Greeter#shout() : String")
   end
+
+  it "hovers helper and container receiver methods" do
+    source = <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+      end
+
+      def demo(candidate : Greeter | Nil)
+        items = [Greeter.new]
+        items.first.shout
+        candidate.not_nil!.shout
+      end
+    CRYSTAL
+
+    query = build_lightweight_hover_query(source)
+    lines = source.lines(chomp: false)
+
+    first_line_number = lines.index! { |item| item.strip == "items.first.shout" }
+    first_column_number = lines[first_line_number].rindex("shout").not_nil! + 2
+    first_hover = Crystalline::Lightweight::Hover.hover(source, first_line_number, first_column_number, query)
+    first_hover.should_not be_nil
+    hover_value(first_hover.not_nil!).should contain("Greeter#shout() : String")
+
+    not_nil_line_number = lines.index! { |item| item.strip == "candidate.not_nil!.shout" }
+    not_nil_column_number = lines[not_nil_line_number].rindex("shout").not_nil! + 2
+    not_nil_hover = Crystalline::Lightweight::Hover.hover(source, not_nil_line_number, not_nil_column_number, query)
+    not_nil_hover.should_not be_nil
+    hover_value(not_nil_hover.not_nil!).should contain("Greeter#shout() : String")
+  end
 end

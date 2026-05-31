@@ -73,14 +73,14 @@ module Crystalline::Lightweight
 
       if instance_var_name?(receiver)
         return {
-          (inference ? inference.types_for_instance_var(receiver) : [] of String).select { |type_name| query.find_type(type_name) != nil },
+          (inference ? inference.types_for_instance_var(receiver) : [] of String).select { |type_name| receiver_type_known?(type_name, query) },
           false,
         }
       end
 
       if class_var_name?(receiver)
         return {
-          (inference ? inference.types_for_class_var(receiver) : [] of String).select { |type_name| query.find_type(type_name) != nil },
+          (inference ? inference.types_for_class_var(receiver) : [] of String).select { |type_name| receiver_type_known?(type_name, query) },
           true,
         }
       end
@@ -88,7 +88,7 @@ module Crystalline::Lightweight
       return {[] of String, false} unless local_name?(receiver)
 
       if inference
-        local_types = inference.types_for(receiver).select { |type_name| query.find_type(type_name) != nil }
+        local_types = inference.types_for(receiver).select { |type_name| receiver_type_known?(type_name, query) }
         return {local_types, false} unless local_types.empty?
       end
 
@@ -102,11 +102,15 @@ module Crystalline::Lightweight
 
     private def chained_call_types(type_names : Array(String), class_method : Bool, method_name : String, query : Query) : {Array(String), Bool}
       if class_method
-        return {type_names.select { |type_name| query.find_type(type_name) != nil }.uniq, false} if method_name == "new"
-        return {type_names.select { |type_name| query.find_type(type_name) != nil }.uniq, true} if method_name == "class"
+        valid_types = type_names.select { |type_name| receiver_type_known?(type_name, query) }.uniq
+        return {valid_types, false} if method_name == "new"
+        return {valid_types, true} if method_name == "class"
       elsif method_name == "class"
-        return {type_names.select { |type_name| query.find_type(type_name) != nil }.uniq, true}
+        return {type_names.select { |type_name| receiver_type_known?(type_name, query) }.uniq, true}
       end
+
+      special_types = type_names.flat_map { |type_name| special_return_type_names(type_name, method_name, query) }.uniq
+      return {special_types, false} unless special_types.empty?
 
       return_types = type_names.flat_map do |type_name|
         query.methods_for(type_name, class_method: class_method).select { |method|
@@ -119,13 +123,87 @@ module Crystalline::Lightweight
       {return_types.uniq, false}
     end
 
+    private def receiver_type_known?(type_name : String, query : Query) : Bool
+      query.find_type(type_name) != nil || !special_return_type_names(type_name, "first", query).empty? || !special_return_type_names(type_name, "[]", query).empty?
+    end
+
+    private def special_return_type_names(type_name : String, method_name : String, query : Query) : Array(String)
+      case method_name
+      when "not_nil!"
+        return normalize_type_names(type_name).reject(&.==("Nil"))
+      when "first", "last", "[]"
+        if element_types = array_element_types(type_name)
+          return element_types.select { |item| receiver_type_known?(item, query) || query.find_type(item) != nil }
+        elsif value_types = hash_value_types(type_name)
+          return value_types.select { |item| receiver_type_known?(item, query) || query.find_type(item) != nil }
+        end
+      when "first?", "last?", "[]?"
+        if element_types = array_element_types(type_name)
+          return (element_types + ["Nil"]).uniq
+        elsif value_types = hash_value_types(type_name)
+          return (value_types + ["Nil"]).uniq
+        end
+      when "fetch"
+        if value_types = hash_value_types(type_name)
+          return value_types
+        end
+      end
+
+      [] of String
+    end
+
     private def return_type_names(return_type : String?, query : Query) : Array(String)
       return [] of String unless return_type
 
-      normalized = return_type.strip
+      normalize_type_names(return_type).select { |type_name| receiver_type_known?(type_name, query) || query.find_type(type_name) != nil }
+    end
+
+    private def normalize_type_names(type_name : String) : Array(String)
+      normalized = type_name.strip
       normalized = normalized[1...-1] if normalized.starts_with?('(') && normalized.ends_with?(')')
-      names = normalized.includes?(" | ") ? normalized.split(" | ").map(&.strip) : [normalized]
-      names.select { |type_name| query.find_type(type_name) != nil }
+      normalized.includes?(" | ") ? normalized.split(" | ").map(&.strip).reject(&.empty?).uniq : [normalized]
+    end
+
+    private def array_element_types(type_name : String) : Array(String)?
+      generic_type_arguments(type_name, "Array", 1).try { |parts| normalize_type_names(parts[0]) }
+    end
+
+    private def hash_value_types(type_name : String) : Array(String)?
+      generic_type_arguments(type_name, "Hash", 2).try { |parts| normalize_type_names(parts[1]) }
+    end
+
+    private def generic_type_arguments(type_name : String, generic_name : String, arity : Int32) : Array(String)?
+      normalized = type_name.strip
+      prefix = "#{generic_name}("
+      return unless normalized.starts_with?(prefix) && normalized.ends_with?(')')
+
+      parts = split_top_level(normalized[prefix.size...-1])
+      return unless parts.size == arity
+
+      parts
+    end
+
+    private def split_top_level(value : String) : Array(String)
+      parts = [] of String
+      depth = 0
+      start = 0
+
+      value.each_char_with_index do |char, index|
+        case char
+        when '('
+          depth += 1
+        when ')'
+          depth -= 1 if depth > 0
+        when ','
+          if depth == 0
+            parts << value[start...index].strip
+            start = index + 1
+          end
+        end
+      end
+
+      parts << value[start..].to_s.strip
+      parts.reject(&.empty?)
     end
   end
 end

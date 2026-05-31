@@ -114,9 +114,9 @@ module Crystalline::Lightweight
       when Crystal::NumberLiteral
         [number_kind_name(node.kind)]
       when Crystal::ArrayLiteral
-        ["Array"]
+        infer_array_literal_types(node)
       when Crystal::HashLiteral
-        ["Hash"]
+        infer_hash_literal_types(node)
       when Crystal::Call
         infer_call_types(node)
       when Crystal::Or
@@ -153,6 +153,12 @@ module Crystalline::Lightweight
         end
       end
 
+      if object = node.obj
+        object_types = infer_types(object)
+        special_types = infer_special_call_types(node, object_types)
+        return special_types unless special_types.empty?
+      end
+
       return_types = [] of String
 
       if object = node.obj
@@ -172,6 +178,114 @@ module Crystalline::Lightweight
       end
 
       return_types.uniq
+    end
+
+    private def infer_special_call_types(node : Crystal::Call, object_types : Array(String)) : Array(String)
+      case node.name
+      when "not_nil!"
+        return object_types.reject(&.==("Nil")).uniq
+      when "as"
+        if target = node.args.first?
+          if path = target.as?(Crystal::Path)
+            return [path.to_s] if @query.find_type(path.to_s)
+          end
+        end
+      when "as?"
+        if target = node.args.first?
+          if path = target.as?(Crystal::Path)
+            return [path.to_s, "Nil"] if @query.find_type(path.to_s)
+          end
+        end
+      end
+
+      return_types = [] of String
+      object_types.each do |type_name|
+        return_types.concat(container_call_types(type_name, node.name))
+      end
+      return_types.uniq
+    end
+
+    private def infer_array_literal_types(node : Crystal::ArrayLiteral) : Array(String)
+      element_types = node.elements.flat_map { |element| infer_types(element) }.uniq
+      return ["Array"] if element_types.empty?
+
+      ["Array(#{join_union_types(element_types)})"]
+    end
+
+    private def infer_hash_literal_types(node : Crystal::HashLiteral) : Array(String)
+      key_types = node.entries.flat_map { |entry| infer_types(entry.key) }.uniq
+      value_types = node.entries.flat_map { |entry| infer_types(entry.value) }.uniq
+      return ["Hash"] if key_types.empty? || value_types.empty?
+
+      ["Hash(#{join_union_types(key_types)}, #{join_union_types(value_types)})"]
+    end
+
+    private def container_call_types(type_name : String, method_name : String) : Array(String)
+      if element_types = array_element_types(type_name)
+        case method_name
+        when "first", "last", "[]"
+          return element_types
+        when "first?", "last?", "[]?"
+          return (element_types + ["Nil"]).uniq
+        end
+      end
+
+      if value_types = hash_value_types(type_name)
+        case method_name
+        when "[]", "fetch"
+          return value_types
+        when "[]?"
+          return (value_types + ["Nil"]).uniq
+        end
+      end
+
+      [] of String
+    end
+
+    private def array_element_types(type_name : String) : Array(String)?
+      generic_type_arguments(type_name, "Array", 1).try { |parts| expand_type_names(parts[0]) }
+    end
+
+    private def hash_value_types(type_name : String) : Array(String)?
+      generic_type_arguments(type_name, "Hash", 2).try { |parts| expand_type_names(parts[1]) }
+    end
+
+    private def generic_type_arguments(type_name : String, generic_name : String, arity : Int32) : Array(String)?
+      normalized = type_name.strip
+      prefix = "#{generic_name}("
+      return unless normalized.starts_with?(prefix) && normalized.ends_with?(')')
+
+      parts = split_top_level(normalized[prefix.size...-1])
+      return unless parts.size == arity
+
+      parts
+    end
+
+    private def split_top_level(value : String) : Array(String)
+      parts = [] of String
+      depth = 0
+      start = 0
+
+      value.each_char_with_index do |char, index|
+        case char
+        when '('
+          depth += 1
+        when ')'
+          depth -= 1 if depth > 0
+        when ','
+          if depth == 0
+            parts << value[start...index].strip
+            start = index + 1
+          end
+        end
+      end
+
+      parts << value[start..].to_s.strip
+      parts.reject(&.empty?)
+    end
+
+    private def join_union_types(type_names : Array(String)) : String
+      type_names.uniq.join(" | ")
     end
 
     private def expand_type_names(type_name : String) : Array(String)

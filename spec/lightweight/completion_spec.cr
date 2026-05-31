@@ -310,4 +310,33 @@ describe Crystalline::Lightweight::Completion do
     items = Crystalline::Lightweight::Completion.complete(source, line_number, context.not_nil!, query).not_nil!
     items.map(&.insert_text).compact.should contain("shout")
   end
+
+  it "completes common helper and container receivers" do
+    source = <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+      end
+
+      def demo(candidate : Greeter | Nil)
+        items = [Greeter.new]
+        items.first.sh
+        candidate.not_nil!.sh
+      end
+    CRYSTAL
+
+    query = build_lightweight_query(source)
+    lines = source.lines(chomp: false)
+
+    first_line_number = lines.index! { |item| item.includes?("items.first.sh") }
+    first_context = Crystalline::CompletionContext.detect(lines[first_line_number], lines[first_line_number].size - 1, nil)
+    first_items = Crystalline::Lightweight::Completion.complete(source, first_line_number, first_context.not_nil!, query).not_nil!
+    first_items.map(&.insert_text).compact.should contain("shout")
+
+    not_nil_line_number = lines.index! { |item| item.includes?("candidate.not_nil!.sh") }
+    not_nil_context = Crystalline::CompletionContext.detect(lines[not_nil_line_number], lines[not_nil_line_number].size - 1, nil)
+    not_nil_items = Crystalline::Lightweight::Completion.complete(source, not_nil_line_number, not_nil_context.not_nil!, query).not_nil!
+    not_nil_items.map(&.insert_text).compact.should contain("shout")
+  end
 end
