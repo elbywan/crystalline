@@ -25,6 +25,12 @@ private def build_lightweight_query(source : String)
   end
 end
 
+private def build_syntax_query(source : String)
+  index = Crystalline::Lightweight::Index.from_source(source)
+  raise "expected syntax index" unless index
+  Crystalline::Lightweight::Query.new(index)
+end
+
 describe Crystalline::Lightweight::Completion do
   it "completes instance methods from inferred local receiver types" do
     source = <<-CRYSTAL
@@ -338,5 +344,24 @@ describe Crystalline::Lightweight::Completion do
     not_nil_context = Crystalline::CompletionContext.detect(lines[not_nil_line_number], lines[not_nil_line_number].size - 1, nil)
     not_nil_items = Crystalline::Lightweight::Completion.complete(source, not_nil_line_number, not_nil_context.not_nil!, query).not_nil!
     not_nil_items.map(&.insert_text).compact.should contain("shout")
+  end
+
+  it "completes methods in standalone syntax-only files" do
+    source = <<-CRYSTAL
+      class Clazz
+        def method1(num : Int32)
+          2
+        end
+      end
+
+      puts Clazz.new.method
+    CRYSTAL
+
+    query = build_syntax_query(source)
+    lines = source.lines(chomp: false)
+    line_number = lines.index! { |item| item.includes?("Clazz.new.method") }
+    context = Crystalline::CompletionContext.detect(lines[line_number], lines[line_number].size - 1, nil)
+    items = Crystalline::Lightweight::Completion.complete(source, line_number, context.not_nil!, query).not_nil!
+    items.map(&.insert_text).compact.should contain("method1")
   end
 end

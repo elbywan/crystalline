@@ -1,3 +1,5 @@
+require "compiler/crystal/syntax"
+
 module Crystalline::Lightweight
   enum TypeKind
     Class
@@ -50,6 +52,65 @@ module Crystalline::Lightweight
           end
         end
       end
+    end
+
+    def self.from_source(source : String) : self?
+      parser = Crystal::Parser.new(source)
+      parser.wants_doc = false
+      ast = parser.parse
+
+      new.tap do |index|
+        index.index_syntax_node(ast)
+      end
+    rescue Crystal::SyntaxException
+      nil
+    end
+
+    protected def index_syntax_node(node : Crystal::ASTNode, namespace : String? = nil)
+      case node
+      when Crystal::Expressions
+        node.expressions.each { |expression| index_syntax_node(expression, namespace) }
+      when Crystal::ClassDef
+        type_name = qualify_type_name(node.name.to_s, namespace)
+        type_info = (@types[type_name] ||= TypeInfo.new(type_name, node.struct? ? TypeKind::Struct : TypeKind::Class, node.doc))
+        index_syntax_type_body(type_info, node.body, type_name)
+      when Crystal::ModuleDef
+        type_name = qualify_type_name(node.name.to_s, namespace)
+        type_info = (@types[type_name] ||= TypeInfo.new(type_name, TypeKind::Module, node.doc))
+        index_syntax_type_body(type_info, node.body, type_name)
+      when Crystal::EnumDef
+        type_name = qualify_type_name(node.name.to_s, namespace)
+        @types[type_name] ||= TypeInfo.new(type_name, TypeKind::Enum, node.doc)
+      when Crystal::AnnotationDef
+        type_name = qualify_type_name(node.name.to_s, namespace)
+        @types[type_name] ||= TypeInfo.new(type_name, TypeKind::Annotation, node.doc)
+      when Crystal::Def
+        return if node.receiver
+        @top_level_methods << method_info_for(node, owner: "::")
+      end
+    end
+
+    protected def index_syntax_type_body(type_info : TypeInfo, node : Crystal::ASTNode, type_name : String)
+      case node
+      when Crystal::Expressions
+        node.expressions.each do |expression|
+          case expression
+          when Crystal::Def
+            type_info.methods << method_info_for(expression, owner: type_name, class_method: !expression.receiver.nil?)
+          when Crystal::ClassDef, Crystal::ModuleDef, Crystal::EnumDef, Crystal::AnnotationDef
+            nested_name = qualify_type_name(expression.name.to_s, type_name)
+            type_info.subtypes << nested_name unless type_info.subtypes.includes?(nested_name)
+            index_syntax_node(expression, type_name)
+          end
+        end
+      when Crystal::Def
+        type_info.methods << method_info_for(node, owner: type_name, class_method: !node.receiver.nil?)
+      end
+    end
+
+    protected def qualify_type_name(name : String, namespace : String?)
+      return name if namespace.nil? || name.includes?("::")
+      "#{namespace}::#{name}"
     end
 
     protected def index_type(type : Crystal::NamedType)

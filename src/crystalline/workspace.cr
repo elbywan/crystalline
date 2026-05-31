@@ -249,6 +249,14 @@ class Crystalline::Workspace
     Project.best_fit_for_file(@projects, file_uri)
   end
 
+  private def lightweight_query_for(file_uri : URI, source : String) : Crystalline::Lightweight::Query?
+    if project = project_for_file(file_uri)
+      project.lightweight_query
+    else
+      Crystalline::Lightweight::Index.from_source(source).try { |index| Crystalline::Lightweight::Query.new(index) }
+    end
+  end
+
   private def semantic_cache_key(file_uri : URI) : String
     if (project = project_for_file(file_uri)) && (entry_point = project.entry_point?)
       entry_point.to_s
@@ -287,10 +295,13 @@ class Crystalline::Workspace
   end
 
   def hover(server : LSP::Server, file_uri : URI, position : LSP::Position)
-    if (text_document = @opened_documents[file_uri.to_s]?) && (query = project_for_file(file_uri).try &.lightweight_query)
-      if hover = Crystalline::Lightweight::Hover.hover(fix_source(text_document.contents), position.line, position.character, query)
-        LSP::Log.info { "[hover] lightweight hit: #{file_uri.decoded_path}:#{position.line}:#{position.character}" }
-        return hover
+    if text_document = @opened_documents[file_uri.to_s]?
+      source = fix_source(text_document.contents)
+      if query = lightweight_query_for(file_uri, source)
+        if hover = Crystalline::Lightweight::Hover.hover(source, position.line, position.character, query)
+          LSP::Log.info { "[hover] lightweight hit: #{file_uri.decoded_path}:#{position.line}:#{position.character}" }
+          return hover
+        end
       end
     end
 
@@ -449,7 +460,7 @@ class Crystalline::Workspace
 
     trigger_character = completion_context.trigger_character
 
-    if (query = project_for_file(file_uri).try &.lightweight_query)
+    if query = lightweight_query_for(file_uri, document_lines.join)
       if completion_items = Crystalline::Lightweight::Completion.complete(document_lines.join, position.line, completion_context, query)
         unless completion_items.empty?
           LSP::Log.info { "[completion] lightweight hit: #{file_uri.decoded_path}:#{position.line}:#{position.character}" }

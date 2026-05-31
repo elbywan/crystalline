@@ -28,6 +28,12 @@ private def hover_value(hover : LSP::Hover)
   hover.contents.as(LSP::MarkupContent).value
 end
 
+private def build_syntax_hover_query(source : String)
+  index = Crystalline::Lightweight::Index.from_source(source)
+  raise "expected syntax index" unless index
+  Crystalline::Lightweight::Query.new(index)
+end
+
 describe Crystalline::Lightweight::Hover do
   it "hovers inferred local variable types" do
     source = <<-CRYSTAL
@@ -232,5 +238,26 @@ describe Crystalline::Lightweight::Hover do
     not_nil_hover = Crystalline::Lightweight::Hover.hover(source, not_nil_line_number, not_nil_column_number, query)
     not_nil_hover.should_not be_nil
     hover_value(not_nil_hover.not_nil!).should contain("Greeter#shout() : String")
+  end
+
+  it "hovers methods in standalone syntax-only files" do
+    source = <<-CRYSTAL
+      class Clazz
+        def method1(num : Int32)
+          2
+        end
+      end
+
+      puts Clazz.new.method1(num: 42)
+    CRYSTAL
+
+    query = build_syntax_hover_query(source)
+    lines = source.lines(chomp: false)
+    line_number = lines.index! { |item| item.includes?("Clazz.new.method1") }
+    column_number = lines[line_number].rindex("method1").not_nil! + 2
+
+    hover = Crystalline::Lightweight::Hover.hover(source, line_number, column_number, query)
+    hover.should_not be_nil
+    hover_value(hover.not_nil!).should contain("Clazz#method1(num : Int32)")
   end
 end
