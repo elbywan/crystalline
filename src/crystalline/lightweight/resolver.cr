@@ -135,6 +135,8 @@ module Crystalline::Lightweight
       case method_name
       when "not_nil!"
         return normalize_type_names(type_name).reject(&.==("Nil"))
+      when "tap", "each", "each_with_index", "select", "reject"
+        return [type_name]
       when "first", "last", "[]"
         if element_types = array_element_types(type_name)
           return element_types.select { |item| receiver_type_known?(item, query) || query.find_type(item) != nil }
@@ -148,7 +150,7 @@ module Crystalline::Lightweight
         elsif value_types = hash_value_types(type_name)
           return value_types.select { |item| receiver_type_known?(item, query) || query.find_type(item) != nil }
         end
-      when "first?", "last?", "[]?"
+      when "first?", "last?", "[]?", "find"
         if element_types = array_element_types(type_name)
           return (element_types + ["Nil"]).uniq
         elsif tuple_types = tuple_element_types(type_name)

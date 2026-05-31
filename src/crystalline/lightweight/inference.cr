@@ -297,6 +297,10 @@ module Crystalline::Lightweight
             return [path.to_s, "Nil"] if @query.find_type(path.to_s)
           end
         end
+      when "tap", "each", "each_with_index"
+        return object_types.uniq
+      when "select", "reject"
+        return object_types.uniq
       end
 
       return_types = [] of String
@@ -337,8 +341,10 @@ module Crystalline::Lightweight
         case method_name
         when "first", "last", "[]"
           return element_types
-        when "first?", "last?", "[]?"
+        when "first?", "last?", "[]?", "find"
           return (element_types + ["Nil"]).uniq
+        when "select", "reject", "each", "each_with_index"
+          return [type_name]
         end
       end
 

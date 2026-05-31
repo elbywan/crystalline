@@ -336,4 +336,34 @@ describe Crystalline::Lightweight::Hover do
     named_hover.should_not be_nil
     hover_value(named_hover.not_nil!).should contain("Greeter#shout() : String")
   end
+
+  it "hovers helper chains that preserve collection receiver shapes" do
+    source = <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+      end
+
+      def demo(items : Array(Greeter))
+        items.select.first?.not_nil!.shout
+        items.find.not_nil!.shout
+      end
+    CRYSTAL
+
+    query = build_lightweight_hover_query(source)
+    lines = source.lines(chomp: false)
+
+    select_line_number = lines.index! { |item| item.strip == "items.select.first?.not_nil!.shout" }
+    select_column_number = lines[select_line_number].rindex("shout").not_nil! + 2
+    select_hover = Crystalline::Lightweight::Hover.hover(source, select_line_number, select_column_number, query)
+    select_hover.should_not be_nil
+    hover_value(select_hover.not_nil!).should contain("Greeter#shout() : String")
+
+    find_line_number = lines.index! { |item| item.strip == "items.find.not_nil!.shout" }
+    find_column_number = lines[find_line_number].rindex("shout").not_nil! + 2
+    find_hover = Crystalline::Lightweight::Hover.hover(source, find_line_number, find_column_number, query)
+    find_hover.should_not be_nil
+    hover_value(find_hover.not_nil!).should contain("Greeter#shout() : String")
+  end
 end

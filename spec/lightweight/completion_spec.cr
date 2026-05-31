@@ -435,4 +435,32 @@ describe Crystalline::Lightweight::Completion do
     named_items = Crystalline::Lightweight::Completion.complete(source, named_line_number, named_context.not_nil!, query).not_nil!
     named_items.map(&.insert_text).compact.should contain("shout")
   end
+
+  it "completes helper methods that preserve or refine collection receiver shapes" do
+    source = <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+      end
+
+      def demo(items : Array(Greeter))
+        items.select.first?.not_nil!.sh
+        items.find.not_nil!.sh
+      end
+    CRYSTAL
+
+    query = build_lightweight_query(source)
+    lines = source.lines(chomp: false)
+
+    select_line_number = lines.index! { |item| item.includes?("items.select.first?.not_nil!.sh") }
+    select_context = Crystalline::CompletionContext.detect(lines[select_line_number], lines[select_line_number].size - 1, nil)
+    select_items = Crystalline::Lightweight::Completion.complete(source, select_line_number, select_context.not_nil!, query).not_nil!
+    select_items.map(&.insert_text).compact.should contain("shout")
+
+    find_line_number = lines.index! { |item| item.includes?("items.find.not_nil!.sh") }
+    find_context = Crystalline::CompletionContext.detect(lines[find_line_number], lines[find_line_number].size - 1, nil)
+    find_items = Crystalline::Lightweight::Completion.complete(source, find_line_number, find_context.not_nil!, query).not_nil!
+    find_items.map(&.insert_text).compact.should contain("shout")
+  end
 end
