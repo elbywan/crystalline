@@ -342,7 +342,14 @@ class Crystalline::Workspace
   end
 
   def definitions(server : LSP::Server, file_uri : URI, position : LSP::Position)
-    result = self.compile(server, file_uri, in_memory: true, wants_doc: true)
+    result = @semantic_cache[semantic_cache_key(file_uri)]?
+    unless result
+      LSP::Log.info { "[definitions] bail without compile: #{file_uri.decoded_path}:#{position.line}:#{position.character}" }
+      return
+    end
+
+    LSP::Log.info { "[definitions] semantic cache hit: #{file_uri.decoded_path}:#{position.line}:#{position.character}" }
+
     location = Crystal::Location.new(
       file_uri.decoded_path,
       line_number: position.line + 1,

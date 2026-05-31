@@ -86,4 +86,27 @@ describe Crystalline::Workspace do
     end
   end
 
+  it "does not compile definition requests without a semantic cache" do
+    source = <<-CRYSTAL
+      class Greeter
+        def shout : String
+          "!"
+        end
+      end
+
+      def demo(greeter : Greeter)
+        greeter.shout
+      end
+    CRYSTAL
+
+    with_workspace_document(source) do |server, workspace, uri|
+      lines = source.lines(chomp: false)
+      line_number = lines.index! { |line| line.includes?("greeter.shout") }
+      character = lines[line_number].rindex("shout").not_nil! + 2
+      position = LSP::Position.new(line: line_number, character: character)
+
+      workspace.definitions(server, uri, position).should be_nil
+    end
+  end
+
 end
