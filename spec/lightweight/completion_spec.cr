@@ -444,9 +444,10 @@ describe Crystalline::Lightweight::Completion do
         end
       end
 
-      def demo(items : Array(Greeter))
+      def demo(items : Array(Greeter), candidate : Greeter | Nil)
         items.select.first?.not_nil!.sh
         items.find.not_nil!.sh
+        candidate.try &.sh
       end
     CRYSTAL
 
@@ -462,6 +463,11 @@ describe Crystalline::Lightweight::Completion do
     find_context = Crystalline::CompletionContext.detect(lines[find_line_number], lines[find_line_number].size - 1, nil)
     find_items = Crystalline::Lightweight::Completion.complete(source, find_line_number, find_context.not_nil!, query).not_nil!
     find_items.map(&.insert_text).compact.should contain("shout")
+
+    try_line_number = lines.index! { |item| item.includes?("candidate.try &.sh") }
+    try_context = Crystalline::CompletionContext.detect(lines[try_line_number], lines[try_line_number].size - 1, nil)
+    try_items = Crystalline::Lightweight::Completion.complete(source, try_line_number, try_context.not_nil!, query).not_nil!
+    try_items.map(&.insert_text).compact.should contain("shout")
   end
 
   it "completes richer hash and reducer helper flows" do

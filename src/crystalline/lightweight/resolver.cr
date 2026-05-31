@@ -6,29 +6,49 @@ module Crystalline::Lightweight
   module Resolver
     extend self
 
+    SAFE_TRY_SEGMENT = "__lightweight_try__"
+
     def receiver_types(source : String, line_number : Int32, analysis_column : Int32, receiver : String, query : Query) : {Array(String), Bool}
-      segments = receiver.split('.')
+      segments = receiver.split('.').reject(&.empty?)
       return {[] of String, false} if segments.empty?
 
       type_names, class_method = root_receiver_types(source, line_number, analysis_column, segments.shift, query)
       return {[] of String, class_method} if type_names.empty?
 
-      segments.each do |segment|
-        type_names, class_method = chained_call_types(type_names, class_method, segment, query)
-        return {[] of String, class_method} if type_names.empty?
+      index = 0
+      while index < segments.size
+        segment = segments[index]
+        if segment == SAFE_TRY_SEGMENT
+          safe_method = segments[index + 1]?
+          unless safe_method
+            safe_receiver_types = type_names.reject(&.==("Nil")).uniq
+            return {safe_receiver_types, false}
+          end
+
+          type_names, class_method = safe_chained_call_types(type_names, class_method, safe_method, query)
+          return {[] of String, class_method} if type_names.empty?
+          index += 2
+        else
+          type_names, class_method = chained_call_types(type_names, class_method, segment, query)
+          return {[] of String, class_method} if type_names.empty?
+          index += 1
+        end
       end
 
       {type_names, class_method}
     end
 
     def receiver_from_prefix(prefix : String) : String
-      start = prefix.size
+      normalized_prefix = prefix
+        .gsub(/\.try\s*&\./, ".#{SAFE_TRY_SEGMENT}.")
+        .gsub(/\.try\s*&$/, ".#{SAFE_TRY_SEGMENT}.")
+      start = normalized_prefix.size
 
-      while start > 0 && receiver_expression_char?(prefix[start - 1])
+      while start > 0 && receiver_expression_char?(normalized_prefix[start - 1])
         start -= 1
       end
 
-      prefix[start..]? || ""
+      normalized_prefix[start..]? || ""
     end
 
     def receiver_expression_char?(char : Char)
@@ -100,6 +120,15 @@ module Crystalline::Lightweight
         }.uniq,
         false,
       }
+    end
+
+    private def safe_chained_call_types(type_names : Array(String), class_method : Bool, method_name : String, query : Query) : {Array(String), Bool}
+      non_nil_types = type_names.reject(&.==("Nil")).uniq
+      return {type_names.includes?("Nil") ? ["Nil"] : [] of String, false} if non_nil_types.empty?
+
+      resolved_types, _ = chained_call_types(non_nil_types, class_method, method_name, query)
+      resolved_types = (resolved_types + ["Nil"]).uniq if type_names.includes?("Nil")
+      {resolved_types, false}
     end
 
     private def chained_call_types(type_names : Array(String), class_method : Bool, method_name : String, query : Query) : {Array(String), Bool}

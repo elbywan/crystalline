@@ -345,9 +345,10 @@ describe Crystalline::Lightweight::Hover do
         end
       end
 
-      def demo(items : Array(Greeter))
+      def demo(items : Array(Greeter), candidate : Greeter | Nil)
         items.select.first?.not_nil!.shout
         items.find.not_nil!.shout
+        candidate.try &.shout
       end
     CRYSTAL
 
@@ -365,6 +366,12 @@ describe Crystalline::Lightweight::Hover do
     find_hover = Crystalline::Lightweight::Hover.hover(source, find_line_number, find_column_number, query)
     find_hover.should_not be_nil
     hover_value(find_hover.not_nil!).should contain("Greeter#shout() : String")
+
+    try_line_number = lines.index! { |item| item.strip == "candidate.try &.shout" }
+    try_column_number = lines[try_line_number].rindex("shout").not_nil! + 2
+    try_hover = Crystalline::Lightweight::Hover.hover(source, try_line_number, try_column_number, query)
+    try_hover.should_not be_nil
+    hover_value(try_hover.not_nil!).should contain("Greeter#shout() : String")
   end
 
   it "hovers richer hash and reducer helper flows" do

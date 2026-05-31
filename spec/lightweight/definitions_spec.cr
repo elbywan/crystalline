@@ -100,13 +100,14 @@ describe Crystalline::Lightweight::Definitions do
         end
       end
 
-      def demo
+      def demo(candidate : Greeter | Nil)
         lookup = {"primary" => Greeter.new}
         lookup.dig.shout
 
         items = [Greeter.new]
         items.find!.shout
         items.compact_map
+        candidate.try &.shout
       end
     CRYSTAL
 
@@ -130,5 +131,11 @@ describe Crystalline::Lightweight::Definitions do
     inherited_character = lines[inherited_line_number].rindex("compact_map").not_nil! + 2
     inherited_locations = Crystalline::Lightweight::Definitions.definitions(source, file_uri, inherited_line_number, inherited_character, query)
     inherited_locations.should_not be_nil
+
+    try_line_number = lines.index! { |line| line.strip == "candidate.try &.shout" }
+    try_character = lines[try_line_number].rindex("shout").not_nil! + 2
+    try_locations = Crystalline::Lightweight::Definitions.definitions(source, file_uri, try_line_number, try_character, query)
+    try_locations.should_not be_nil
+    try_locations.not_nil!.first.range.start.line.should eq(1)
   end
 end
