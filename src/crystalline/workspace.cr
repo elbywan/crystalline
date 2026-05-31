@@ -45,39 +45,38 @@ class Crystalline::Workspace
 
   def update_document(server : LSP::Server, params : LSP::DidChangeTextDocumentParams)
     file_uri = params.text_document.uri
-    @opened_documents[file_uri]?.try { |document|
+    parsed_uri = URI.parse(file_uri)
+    document = @opened_documents[file_uri]?
+
+    document.try { |opened_document|
       content_changes = params.content_changes.map { |change|
         {change.text, change.range}
       }
-      document.update_contents(content_changes, version: params.text_document.version)
-
-      document.project?.try(&.entry_point?).try { |entry|
-        @result_cache.invalidate(entry.to_s)
-      }
+      opened_document.update_contents(content_changes, version: params.text_document.version)
     }
+
     @result_cache.invalidate(file_uri)
-    invalidate_semantic_cache(URI.parse(file_uri))
+    invalidate_project_caches(parsed_uri, document)
     # spawn self.compile(server, URI.parse(file_uri), in_memory: true )
   end
 
   def close_document(server : LSP::Server, params : LSP::DidCloseTextDocumentParams)
     file_uri = params.text_document.uri
+    parsed_uri = URI.parse(file_uri)
     document = @opened_documents.delete(params.text_document.uri)
     @result_cache.invalidate(file_uri)
-    invalidate_semantic_cache(URI.parse(file_uri))
+    invalidate_project_caches(parsed_uri, document)
     Diagnostics.new.init_value(file_uri).publish(server) unless document.try(&.project?)
   end
 
   def save_document(server : LSP::Server, params : LSP::DidSaveTextDocumentParams)
     file_uri = params.text_document.uri
-    @opened_documents[file_uri]?.try { |document|
-      document.mark_saved
-      document.project?.try(&.entry_point?).try { |entry|
-        @result_cache.invalidate(entry.to_s)
-      }
-    }
+    parsed_uri = URI.parse(file_uri)
+    document = @opened_documents[file_uri]?
+
+    document.try &.mark_saved
     @result_cache.invalidate(file_uri)
-    invalidate_semantic_cache(URI.parse(file_uri))
+    invalidate_project_caches(parsed_uri, document)
   end
 
   def format_document(params : LSP::DocumentFormattingParams) : {String, TextDocument}?
@@ -276,8 +275,23 @@ class Crystalline::Workspace
     end
   end
 
-  private def invalidate_semantic_cache(file_uri : URI)
-    @semantic_cache.delete(semantic_cache_key(file_uri))
+  private def invalidate_project_caches(file_uri : URI, document : TextDocument?)
+    cache_keys = Set(String).new
+
+    document.try(&.project?).try(&.entry_point?).try { |entry|
+      cache_keys << entry.to_s
+    }
+
+    project_for_file(file_uri).try(&.entry_point?).try { |entry|
+      cache_keys << entry.to_s
+    }
+
+    cache_keys.each do |cache_key|
+      @result_cache.invalidate(cache_key)
+      @semantic_cache.delete(cache_key)
+    end
+
+    @semantic_cache.delete(file_uri.to_s)
   end
 
   private def semantic_cache_allowed?(file_uri : URI) : Bool

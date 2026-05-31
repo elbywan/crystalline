@@ -33,6 +33,10 @@ class Crystalline::Workspace
     @semantic_cache[key] = result
   end
 
+  def semantic_cache_has_key?(key : String) : Bool
+    @semantic_cache.has_key?(key)
+  end
+
   def seed_result_cache(key : String, result : Crystal::Compiler::Result?)
     @result_cache.set(key, result)
   end
@@ -449,7 +453,7 @@ describe Crystalline::Workspace do
     end
   end
 
-  it "invalidates the project entry cache on save" do
+  it "invalidates project caches on save even when dependency lookup no longer matches" do
     source = <<-CRYSTAL
       class Greeter
         def shout : String
@@ -472,7 +476,11 @@ describe Crystalline::Workspace do
       result.should_not be_nil
 
       workspace.seed_result_cache(entry_point.to_s, result)
+      workspace.seed_semantic_result(entry_point.to_s, result.not_nil!)
       workspace.result_cache_invalidated?(entry_point.to_s).should be_false
+      workspace.semantic_cache_has_key?(entry_point.to_s).should be_true
+
+      project.dependencies = Set{entry_point.decoded_path}
 
       workspace.save_document(
         server,
@@ -482,6 +490,7 @@ describe Crystalline::Workspace do
       )
 
       workspace.result_cache_invalidated?(entry_point.to_s).should be_true
+      workspace.semantic_cache_has_key?(entry_point.to_s).should be_false
     end
   end
 end
