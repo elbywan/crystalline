@@ -13,8 +13,6 @@ targets:
 dependencies:
   lsp:
     github: elbywan/crystal-lsp
-  priority-queue:
-    github: spider-gazelle/priority-queue
 
 development_dependencies:
   sentry:
