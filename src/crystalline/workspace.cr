@@ -819,6 +819,51 @@ class Crystalline::Workspace
     }
   end
 
+  # The semantic tokens of an open document. Computed from the buffer itself:
+  # the edits and ranges of the client apply to it, not to the repaired text.
+  def semantic_tokens(file_uri : URI) : LSP::SemanticTokens?
+    @opened_documents[file_uri.to_s]?.try { |text_document|
+      Crystalline::Lightweight::SemanticTokens.tokens(text_document.contents)
+    }
+  end
+
+  def folding_ranges(file_uri : URI) : Array(LSP::FoldingRange)?
+    @opened_documents[file_uri.to_s]?.try { |text_document|
+      Crystalline::Lightweight::FoldingRange.ranges(text_document.contents)
+    }
+  end
+
+  def selection_ranges(file_uri : URI, positions : Array(LSP::Position)) : Array(LSP::SelectionRange)?
+    @opened_documents[file_uri.to_s]?.try { |text_document|
+      lines = text_document.contents.lines(chomp: false)
+      Crystalline::Lightweight::SelectionRange.ranges(text_document.contents, positions, lines)
+    }
+  end
+
+  def document_highlights(file_uri : URI, position : LSP::Position) : Array(LSP::DocumentHighlight)?
+    @opened_documents[file_uri.to_s]?.try { |text_document|
+      Crystalline::Lightweight::DocumentHighlight.highlights(text_document.contents, position.line, position.character)
+    }
+  end
+
+  def signature_help(file_uri : URI, position : LSP::Position) : LSP::SignatureHelp?
+    return unless text_document = @opened_documents[file_uri.to_s]?
+    return unless query = lightweight_query_for(text_document)
+
+    Crystalline::Lightweight::SignatureHelp.help(text_document.contents, position.line, position.character, query)
+  end
+
+  # The symbols of the project sources matching *query*.
+  def workspace_symbols(query : String) : Array(LSP::SymbolInformation)
+    @projects.flat_map { |project|
+      if index = project.lightweight_index || project.source_index
+        Crystalline::Lightweight::WorkspaceSymbol.symbols(index, project.root_uri.decoded_path, query)
+      else
+        [] of LSP::SymbolInformation
+      end
+    }.uniq
+  end
+
   private def fix_source(source : String) : String
     # LSP::Log.info { "Fixing source: #{source}" }
     Crystal::Parser.parse(source)
