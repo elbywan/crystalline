@@ -90,7 +90,10 @@ class Crystalline::TextDocument
 
   private def partial_update(contents : String, range : LSP::Range, version : Int32? = nil)
     prefix = @inner_contents[range.start.line]?.try &.[...range.start.character] || ""
-    suffix = @inner_contents[range.end.line]?.try &.[range.end.character..]? || @inner_contents[range.end.line]? || ""
+    # Positions past the end of a line are clamped to its content: falling back to the
+    # whole line would duplicate it (`line[column..]?` is nil out of range).
+    end_line = @inner_contents[range.end.line]? || ""
+    suffix = end_line[Math.min(range.end.character, end_line.chomp.size)..]
     replacement_lines = String.build { |str|
       str << prefix << contents << suffix
     }.lines(chomp: false)

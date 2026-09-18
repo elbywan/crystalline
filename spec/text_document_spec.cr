@@ -41,6 +41,32 @@ describe Crystalline::TextDocument do
     document.contents.should eq("foo\nbar\n")
   end
 
+  it "clamps out of range update columns to the line content" do
+    document = doc("abc\ndef\n")
+
+    document.update_contents([
+      {"X", LSP::Range.new(
+        start: LSP::Position.new(line: 0, character: 3),
+        end: LSP::Position.new(line: 0, character: 999),
+      )},
+    ], version: 1)
+
+    document.contents.should eq("abcX\ndef\n")
+  end
+
+  it "clamps an out of range end column when replacing across lines" do
+    document = doc("abc\ndef\n")
+
+    document.update_contents([
+      {"Z", LSP::Range.new(
+        start: LSP::Position.new(line: 0, character: 1),
+        end: LSP::Position.new(line: 1, character: 999),
+      )},
+    ], version: 1)
+
+    document.contents.should eq("aZ\n")
+  end
+
   it "updates the version on full document updates" do
     document = doc("foo\n")
 
