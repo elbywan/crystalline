@@ -212,7 +212,9 @@ class Crystalline::Workspace
         return cached_result unless cached_result.nil? && discard_nil_cached_result
       end
 
-      sync_channel = Channel(Crystal::Compiler::Result?).new
+      # Buffered: when the compilation outlives the timeout below, nobody is left
+      # to receive the result and an unbuffered channel would block its fiber forever.
+      sync_channel = Channel(Crystal::Compiler::Result?).new(1)
 
       progress.report(server) do
         # Store the start of the compilation.
