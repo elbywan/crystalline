@@ -1,4 +1,3 @@
-require "priority-queue"
 require "uri"
 require "./project"
 
@@ -12,7 +11,9 @@ class Crystalline::TextDocument
     @version || 0
   end
 
-  @pending_changes : Priority::Queue({String, LSP::Range}) = Priority::Queue({String, LSP::Range}).new
+  # Changes received before their version, ordered by version and, within a
+  # version, in arrival order.
+  @pending_changes = [] of {Int32, String, LSP::Range}
   getter? project : Project?
   getter? dirty = false
 
@@ -50,11 +51,10 @@ class Crystalline::TextDocument
       update_contents(*change, version: version)
     }
 
-    # Check for pending changes
-    loop do
-      break unless @pending_changes.first?.try(&.priority.== self.version + 1)
-      item = @pending_changes.shift
-      partial_update(item.value[0], item.value[1], version: item.priority.to_i32)
+    # Apply the pending changes that can now follow the document version, in order.
+    while (pending = @pending_changes.first?) && (pending[0] == version_number || pending[0] == version_number + 1)
+      @pending_changes.shift
+      partial_update(pending[1], pending[2], version: pending[0])
     end
 
     @dirty = true
@@ -72,7 +72,7 @@ class Crystalline::TextDocument
         partial_update(contents, range, version)
       elsif version
         # Some updates are missing
-        @pending_changes.push version, {contents, range}
+        queue_change(version, contents, range)
       else
         # No version field.
         partial_update(contents, range, version)
@@ -86,6 +86,13 @@ class Crystalline::TextDocument
   private def check_version(version : Int32)
     @version ||= version
     @version == version - 1 || @version == version
+  end
+
+  # Queue a change that arrived before its version, keeping the queue ordered by
+  # version and stable within a version.
+  private def queue_change(version : Int32, contents : String, range : LSP::Range)
+    index = @pending_changes.bsearch_index { |(queued_version, _, _)| queued_version > version } || @pending_changes.size
+    @pending_changes.insert(index, {version, contents, range})
   end
 
   private def partial_update(contents : String, range : LSP::Range, version : Int32? = nil)
