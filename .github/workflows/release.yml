@@ -12,8 +12,6 @@ jobs:
         include:
           - runner: macos-15
             arch: arm64
-          - runner: macos-15-intel
-            arch: x86_64
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout repository
@@ -27,7 +25,9 @@ jobs:
         run: shards install --production --ignore-crystal-version
       - name: Build the binary
         run: |
-          export LLVM_CONFIG="$(brew --prefix llvm)/bin/llvm-config"
+          # Homebrew ships LLVM as a versioned, keg-only formula (`llvm@22` for
+          # the current Crystal): there is no `llvm` alias to ask for.
+          export LLVM_CONFIG="$(ls -d "$(brew --prefix)"/opt/llvm*/bin/llvm-config 2>/dev/null | sort -V | tail -n 1)"
           shards build crystalline --release --no-debug --stats --progress --ignore-crystal-version
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v7.0.1
@@ -61,12 +61,10 @@ jobs:
         run: |
           gzip -r ./artifacts
           mv ./artifacts/crystalline_x86_64-unknown-linux-musl/crystalline.gz ./artifacts/crystalline_x86_64-unknown-linux-musl.gz
-          mv ./artifacts/crystalline_x86_64-apple-darwin/crystalline.gz ./artifacts/crystalline_x86_64-apple-darwin.gz
           mv ./artifacts/crystalline_arm64-apple-darwin/crystalline.gz ./artifacts/crystalline_arm64-apple-darwin.gz
       - name: Create GitHub release
         uses: softprops/action-gh-release@v3.0.0
         with:
           files: |
             ./artifacts/crystalline_x86_64-unknown-linux-musl.gz
-            ./artifacts/crystalline_x86_64-apple-darwin.gz
             ./artifacts/crystalline_arm64-apple-darwin.gz

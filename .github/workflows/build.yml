@@ -16,8 +16,6 @@ jobs:
         include:
           - runner: macos-15
             arch: arm64
-          - runner: macos-15-intel
-            arch: x86_64
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout repository
@@ -29,7 +27,9 @@ jobs:
         run: brew update && brew install crystal || true
       - name: Build the binary
         run: |
-          export LLVM_CONFIG="$(brew --prefix llvm)/bin/llvm-config"
+          # Homebrew ships LLVM as a versioned, keg-only formula (`llvm@22` for
+          # the current Crystal): there is no `llvm` alias to ask for.
+          export LLVM_CONFIG="$(ls -d "$(brew --prefix)"/opt/llvm*/bin/llvm-config 2>/dev/null | sort -V | tail -n 1)"
           shards build crystalline --release --no-debug --stats --progress --ignore-crystal-version
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v7.0.1
