@@ -1,6 +1,5 @@
 require "spec"
 require "lsp/server"
-require "../src/crystalline/ext/code_action_kind"
 
 describe LSP::CodeActionKind do
   it "parses the kinds announced by the shard" do
@@ -8,9 +7,13 @@ describe LSP::CodeActionKind do
     LSP::CodeActionKind.parse("refactor.extract").should eq(LSP::CodeActionKind::RefactorExtract)
   end
 
-  it "parses open and custom kinds" do
-    LSP::CodeActionKind.parse("source.fixAll").should eq(LSP::CodeActionKind::Source)
+  it "parses the sub-kinds the shard maps" do
+    LSP::CodeActionKind.parse("source.fixAll").should eq(LSP::CodeActionKind::SourceFixAll)
+  end
+
+  it "ignores custom and unmapped sub-kinds" do
     LSP::CodeActionKind.parse("custom.kind").should eq(LSP::CodeActionKind::Empty)
+    LSP::CodeActionKind.parse("refactor.extract.function").should eq(LSP::CodeActionKind::Empty)
   end
 
   it "deserializes client capabilities announcing custom code action kinds" do
@@ -32,6 +35,6 @@ describe LSP::CodeActionKind do
       .code_action_kind.not_nil!
       .value_set.not_nil!
 
-    value_set.should eq([LSP::CodeActionKind::Source, LSP::CodeActionKind::QuickFix])
+    value_set.should eq([LSP::CodeActionKind::SourceFixAll, LSP::CodeActionKind::QuickFix])
   end
 end
