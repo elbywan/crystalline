@@ -27,9 +27,18 @@ module Crystalline
     hover_provider: true,
     definition_provider: true,
     document_symbol_provider: true,
-    # signature_help_provider: LSP::SignatureHelpOptions.new(
-    #   trigger_characters: ["(", " "]
-    # ),
+    workspace_symbol_provider: true,
+    document_highlight_provider: true,
+    folding_range_provider: true,
+    selection_range_provider: true,
+    signature_help_provider: LSP::SignatureHelpOptions.new(
+      trigger_characters: ["(", ","],
+      retrigger_characters: [","],
+    ),
+    semantic_tokens_provider: LSP::SemanticTokensOptions.new(
+      legend: Crystalline::Lightweight::SemanticTokens.legend,
+      full: true,
+    ),
   )
 
   module EnvironmentConfig

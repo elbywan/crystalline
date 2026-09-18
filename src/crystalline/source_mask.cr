@@ -5,6 +5,7 @@ module Crystalline
   # miss, not a resolution attempt).
   class SourceMask
     @ranges = {} of Int32 => Array(Range(Int32, Int32))
+    @comment_starts = {} of Int32 => Int32
     @heredoc_terminators = [] of String
 
     def initialize(source : String)
@@ -13,6 +14,12 @@ module Crystalline
 
     def comment_or_string?(line : Int32, column : Int32) : Bool
       @ranges[line]?.try(&.any? { |range| range.covers?(column) }) || false
+    end
+
+    # The character index where a comment starts on *line*, or nil. Only a `#`
+    # outside a literal starts a comment: the mask knows which ones do.
+    def comment_start(line : Int32) : Int32?
+      @comment_starts[line]?
     end
 
     private def scan(source : String)
@@ -39,6 +46,7 @@ module Crystalline
       while index < line.size
         case line[index]
         when '#'
+          @comment_starts[line_index] = index
           ranges << (index...line.size)
           break
         when '"'

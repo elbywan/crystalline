@@ -96,6 +96,37 @@ class Crystalline::Controller
           }
         end
       end
+    when LSP::SemanticTokensRequest
+      return nil unless @pending_requests.includes? message.id
+      @documents_lock.synchronize do
+        file_uri = URI.parse message.params.text_document.uri
+        workspace.semantic_tokens(file_uri)
+      end
+    when LSP::FoldingRangeRequest
+      return nil unless @pending_requests.includes? message.id
+      @documents_lock.synchronize do
+        file_uri = URI.parse message.params.text_document.uri
+        workspace.folding_ranges(file_uri)
+      end
+    when LSP::SelectionRangeRequest
+      return nil unless @pending_requests.includes? message.id
+      @documents_lock.synchronize do
+        file_uri = URI.parse message.params.text_document.uri
+        workspace.selection_ranges(file_uri, message.params.positions)
+      end
+    when LSP::DocumentHighlightRequest
+      return nil unless @pending_requests.includes? message.id
+      @documents_lock.synchronize do
+        file_uri = URI.parse message.params.text_document.uri
+        workspace.document_highlights(file_uri, message.params.position)
+      end
+    when LSP::SignatureHelpRequest
+      return nil unless @pending_requests.includes? message.id
+      file_uri = URI.parse message.params.text_document.uri
+      workspace.signature_help(file_uri, message.params.position)
+    when LSP::WorkspaceSymbolRequest
+      return nil unless @pending_requests.includes? message.id
+      workspace.workspace_symbols(message.params.query)
     else
       nil
     end

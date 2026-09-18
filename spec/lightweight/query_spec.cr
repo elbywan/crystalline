@@ -154,3 +154,21 @@ describe Crystalline::Lightweight::Query do
     names.should contain("overlay_method")
   end
 end
+
+describe "splat arguments through specialization" do
+  it "keeps splat, double splat and block arguments when specializing a generic method" do
+    index = Crystalline::Lightweight::Index.from_source(<<-SRC, "/tmp/specialize_spec.cr").not_nil!
+    class Box(T)
+      def fill(*values : T, **options, &block : T -> Nil)
+      end
+    end
+    SRC
+    query = Crystalline::Lightweight::Query.new(index)
+
+    method = query.methods_for("Box(Int32)").find { |candidate| candidate.name == "fill" }.not_nil!
+
+    method.args.map(&.splat).should eq([true])
+    method.double_splat.not_nil!.name.should eq("options")
+    method.block_arg.not_nil!.name.should eq("block")
+  end
+end

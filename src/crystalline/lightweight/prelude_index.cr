@@ -16,7 +16,7 @@ module Crystalline::Lightweight
     @@loading = false
 
     MAGIC          = "CPLI"
-    FORMAT_VERSION = 9_u8
+    FORMAT_VERSION = 10_u8
 
     # Returns the prelude index, or nil while it is being generated on the
     # first run. Never blocks.
@@ -96,7 +96,7 @@ module Crystalline::Lightweight
           arg_count.times do
             arg_name = read_string(io)
             restriction = read_optional_string(io)
-            args << ArgInfo.new(name: arg_name, restriction: restriction)
+            args << ArgInfo.new(name: arg_name, restriction: restriction, splat: io.read_bytes(UInt8) == 1)
           end
           type.methods << MethodInfo.new(
             name: method_name,
@@ -109,6 +109,8 @@ module Crystalline::Lightweight
             block_restriction: read_optional_string(io),
             # Method locations let go-to-definition jump into the stdlib.
             location: read_optional_location(io),
+            double_splat: read_optional_arg(io),
+            block_arg: read_optional_arg(io),
           )
         end
         parent_count = io.read_bytes(UInt32)
@@ -134,7 +136,7 @@ module Crystalline::Lightweight
         arg_count.times do
           arg_name = read_string(io)
           restriction = read_optional_string(io)
-          args << ArgInfo.new(name: arg_name, restriction: restriction)
+          args << ArgInfo.new(name: arg_name, restriction: restriction, splat: io.read_bytes(UInt8) == 1)
         end
         index.top_level_methods << MethodInfo.new(
           name: method_name,
@@ -145,6 +147,8 @@ module Crystalline::Lightweight
           free_vars: read_string_list(io),
           block_restriction: read_optional_string(io),
           location: read_optional_location(io),
+          double_splat: read_optional_arg(io),
+          block_arg: read_optional_arg(io),
         )
       end
 
@@ -176,10 +180,13 @@ module Crystalline::Lightweight
           method.args.each do |arg|
             write_string(io, arg.name)
             write_optional_string(io, arg.restriction)
+            io.write_bytes(arg.splat ? 1_u8 : 0_u8)
           end
           write_string_list(io, method.free_vars)
           write_optional_string(io, method.block_restriction)
           write_optional_location(io, method.location)
+          write_optional_arg(io, method.double_splat)
+          write_optional_arg(io, method.block_arg)
         end
         io.write_bytes(type.parent_types.size.to_u32)
         type.parent_types.each { |parent_name| write_string(io, parent_name) }
@@ -200,10 +207,13 @@ module Crystalline::Lightweight
         method.args.each do |arg|
           write_string(io, arg.name)
           write_optional_string(io, arg.restriction)
+          io.write_bytes(arg.splat ? 1_u8 : 0_u8)
         end
         write_string_list(io, method.free_vars)
         write_optional_string(io, method.block_restriction)
         write_optional_location(io, method.location)
+        write_optional_arg(io, method.double_splat)
+        write_optional_arg(io, method.block_arg)
       end
 
       temp_path = "#{path}.tmp"
@@ -234,6 +244,14 @@ module Crystalline::Lightweight
       Crystal::Location.new(filename, line, column)
     end
 
+    # `**kwargs` and `&block`, which live outside `Def#args`.
+    private def self.read_optional_arg(io : IO::Memory) : ArgInfo?
+      present = io.read_bytes(UInt8) == 1
+      return unless present
+
+      ArgInfo.new(name: read_string(io), restriction: read_optional_string(io))
+    end
+
     private def self.read_string_list(io : IO::Memory) : Array(String)
       count = io.read_bytes(UInt8)
       Array.new(count) { read_string(io) }
@@ -259,6 +277,16 @@ module Crystalline::Lightweight
         write_string(io, filename)
         io.write_bytes(location.line_number.to_u32)
         io.write_bytes(location.column_number.to_u32)
+      else
+        io.write_bytes(0_u8)
+      end
+    end
+
+    private def self.write_optional_arg(io : IO::Memory, arg : ArgInfo?)
+      if arg
+        io.write_bytes(1_u8)
+        write_string(io, arg.name)
+        write_optional_string(io, arg.restriction)
       else
         io.write_bytes(0_u8)
       end

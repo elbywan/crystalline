@@ -1,3 +1,5 @@
+require "./position_utils"
+
 module Crystalline::Utils
   def self.map_completion_kind(kind, *, default = LSP::CompletionItemKind::Variable)
     case kind
@@ -78,6 +80,39 @@ module Crystalline::Utils
         line: end_location.try(&.line_number.- 1) || 0,
         character: end_location.try(&.column_number.- 1) || 0,
       ),
+    )
+  end
+
+  # Maps a Crystal source location to an LSP position.
+  #
+  # LSP columns are UTF-16 code units while Crystal columns count characters:
+  # they differ on lines holding astral plane characters (emoji, U+10000+).
+  # *lines* are the document lines, so callers converting many positions
+  # (`semantic tokens`, folding ranges) split the source only once.
+  def self.lsp_position(lines : Array(String), location : Crystal::Location) : LSP::Position
+    line_index = location.line_number - 1
+    LSP::Position.new(
+      line: line_index,
+      character: PositionUtils.char_to_utf16_index(lines[line_index]? || "", location.column_number - 1),
+    )
+  end
+
+  # Range spanning from *start_location* to *end_location*.
+  def self.lsp_range(lines : Array(String), start_location : Crystal::Location, end_location : Crystal::Location) : LSP::Range
+    LSP::Range.new(
+      start: lsp_position(lines, start_location),
+      end: lsp_position(lines, end_location),
+    )
+  end
+
+  # Range covering the *size* characters starting at *location* (a name span).
+  def self.lsp_range(lines : Array(String), location : Crystal::Location, size : Int32) : LSP::Range
+    line_index = location.line_number - 1
+    line = lines[line_index]? || ""
+    start_column = location.column_number - 1
+    LSP::Range.new(
+      start: LSP::Position.new(line: line_index, character: PositionUtils.char_to_utf16_index(line, start_column)),
+      end: LSP::Position.new(line: line_index, character: PositionUtils.char_to_utf16_index(line, start_column + size)),
     )
   end
 

@@ -392,7 +392,27 @@ definition signature or the expanded macro.
 #### Document symbols
 
 Fetch all the symbols in a given file, used in VSCode to populate the Outline
-view and the Breadcrumbs.
+view and the Breadcrumbs. Folding ranges, selection ranges and document
+highlights are provided too, so the editor does not have to fall back to its
+own indentation and word matching heuristics.
+
+#### Semantic tokens
+
+Refines the editor's grammar based colors with the symbols the parser resolves
+exactly: namespaces and types, methods and macros, parameters, local variables,
+instance and class variables, literals and comments. Keywords inside
+expressions and operators keep the grammar's colors, and a buffer that does not
+parse only keeps its comments.
+
+#### Signature help
+
+Parameters of the call being typed, with the active parameter highlighted,
+tolerating code that does not parse yet. Splat, double splat and block
+arguments are part of the rendered signature.
+
+#### Workspace symbols
+
+Search the project sources for types, methods, macros and top level functions.
 
 #### Lightweight analysis
 
@@ -418,7 +438,16 @@ closest-type-first. A background compile refines the results once it finishes.
 
 - The parser is not permissive, nor incremental which means that the features
   will sometimes not work. It would involve a massive amount of work to change
-  that.
+  that. The syntax tree based providers (semantic tokens, folding and selection
+  ranges, document highlights) degrade to the part they can still compute on a
+  buffer that does not parse.
+
+- Document highlights resolve local variables, parameters and block arguments:
+  the lightweight engine has no reference index for methods, types and instance
+  variables, so occurrences of those are not highlighted.
+
+- Workspace symbols list the project sources only: standard library and
+  dependency (`lib/`) symbols are left out.
 
 ## Development
 

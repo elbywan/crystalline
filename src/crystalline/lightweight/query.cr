@@ -755,7 +755,7 @@ module Crystalline::Lightweight
         name: method.name,
         owner: owner_name,
         args: method.args.map { |arg|
-          ArgInfo.new(name: arg.name, restriction: substitute_type_vars(arg.restriction, mapping))
+          ArgInfo.new(name: arg.name, restriction: substitute_type_vars(arg.restriction, mapping), splat: arg.splat)
         },
         return_type: substitute_type_vars(method.return_type, mapping),
         class_method: method.class_method,
@@ -766,6 +766,8 @@ module Crystalline::Lightweight
         name_size: method.name_size,
         free_vars: method.free_vars,
         block_restriction: method.block_restriction.try { |restriction| substitute_type_vars(restriction, mapping) },
+        double_splat: method.double_splat,
+        block_arg: method.block_arg,
       )
     end
 
@@ -814,6 +816,8 @@ module Crystalline::Lightweight
             name_size: existing.name_size.zero? ? summary_method.name_size : existing.name_size,
             free_vars: existing.free_vars.empty? ? summary_method.free_vars : existing.free_vars,
             block_restriction: existing.block_restriction || summary_method.block_restriction,
+            double_splat: existing.double_splat || summary_method.double_splat,
+            block_arg: existing.block_arg || summary_method.block_arg,
           )
         else
           existing_index[key] = merged.size
