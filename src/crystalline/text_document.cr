@@ -53,6 +53,10 @@ class Crystalline::TextDocument
     }
 
     # Apply the pending changes that can now follow the document version, in order.
+    #
+    # A queued version holds one entry per change of the notification that carried
+    # it: the first is drained once the document reaches the previous version, the
+    # following ones right after, as the current version.
     while (pending = @pending_changes.first?) && (pending[0] == version_number || pending[0] == version_number + 1)
       @pending_changes.shift
       partial_update(pending[1], pending[2], version: pending[0])
@@ -99,9 +103,12 @@ class Crystalline::TextDocument
   private def partial_update(contents : String, range : LSP::Range, version : Int32? = nil)
     start_line = @inner_contents[range.start.line]? || ""
     end_line = @inner_contents[range.end.line]? || ""
-    # LSP columns are UTF-16 code units, unlike Crystal string indices. The end column
-    # is clamped to the line content: slicing out of range would either include the
-    # line terminator or duplicate the whole line.
+    # LSP columns are UTF-16 code units, unlike Crystal string indices.
+    #
+    # The end column is clamped to the line content: slicing out of range would
+    # include the line terminator or duplicate the whole line. The start column
+    # is deliberately left as is: a column past the line end keeps the whole
+    # prefix, which is what an edit spanning the line break expects.
     prefix = start_line[...PositionUtils.utf16_to_char_index(start_line, range.start.character)]
     end_column = PositionUtils.utf16_to_char_index(end_line, range.end.character).clamp(0, end_line.chomp.size)
     suffix = end_line[end_column..]

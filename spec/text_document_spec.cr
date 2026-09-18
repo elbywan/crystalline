@@ -93,6 +93,30 @@ describe Crystalline::TextDocument do
     document.contents.should eq("a?b\n")
   end
 
+  it "keeps carriage returns out of the updated line content" do
+    document = doc("abc\r\ndef\r\n")
+
+    # End of line 0, where an LSP position stops before the terminator.
+    document.update_contents([
+      {"X", LSP::Range.new(
+        start: LSP::Position.new(line: 0, character: 3),
+        end: LSP::Position.new(line: 0, character: 3),
+      )},
+    ], version: 1)
+
+    document.contents.should eq("abcX\r\ndef\r\n")
+
+    # Replacing the whole of line 1 must keep its own terminator.
+    document.update_contents([
+      {"Z", LSP::Range.new(
+        start: LSP::Position.new(line: 1, character: 0),
+        end: LSP::Position.new(line: 1, character: 3),
+      )},
+    ], version: 2)
+
+    document.contents.should eq("abcX\r\nZ\r\n")
+  end
+
   it "updates the version on full document updates" do
     document = doc("foo\n")
 
