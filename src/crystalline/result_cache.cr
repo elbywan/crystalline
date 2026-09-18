@@ -12,16 +12,15 @@ class Crystalline::ResultCache
     @cache.has_key?(entry)
   end
 
-  # True if the cache has been invalidated *since* the *since* time argument,
-  # or if the entry is invalided if *since* is not provided.
+  # True if the entry has been invalidated *since* the given time, or if the
+  # entry is invalidated if *since* is not provided.
   def invalidated?(entry : String, *, since : Time::Instant? = nil) : Bool
     return false unless exists?(entry)
     invalidation_time = @cache[entry][1]
-    if since
-      !invalidation_time || invalidation_time.not_nil! > since
-    else
-      !invalidation_time.nil?
-    end
+    return !invalidation_time.nil? unless since
+    # A nil invalidation time means that the entry holds a result: it only counts
+    # as invalidated if the invalidation happened after the compilation started.
+    invalidation_time.try(&.>(since)) || false
   end
 
   # Get a cache value.
