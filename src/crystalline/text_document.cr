@@ -1,4 +1,5 @@
 require "uri"
+require "./position_utils"
 require "./project"
 
 class Crystalline::TextDocument
@@ -96,11 +97,14 @@ class Crystalline::TextDocument
   end
 
   private def partial_update(contents : String, range : LSP::Range, version : Int32? = nil)
-    prefix = @inner_contents[range.start.line]?.try &.[...range.start.character] || ""
-    # Positions past the end of a line are clamped to its content: falling back to the
-    # whole line would duplicate it (`line[column..]?` is nil out of range).
+    start_line = @inner_contents[range.start.line]? || ""
     end_line = @inner_contents[range.end.line]? || ""
-    suffix = end_line[Math.min(range.end.character, end_line.chomp.size)..]
+    # LSP columns are UTF-16 code units, unlike Crystal string indices. The end column
+    # is clamped to the line content: slicing out of range would either include the
+    # line terminator or duplicate the whole line.
+    prefix = start_line[...PositionUtils.utf16_to_char_index(start_line, range.start.character)]
+    end_column = PositionUtils.utf16_to_char_index(end_line, range.end.character).clamp(0, end_line.chomp.size)
+    suffix = end_line[end_column..]
     replacement_lines = String.build { |str|
       str << prefix << contents << suffix
     }.lines(chomp: false)

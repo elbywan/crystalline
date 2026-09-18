@@ -67,6 +67,32 @@ describe Crystalline::TextDocument do
     document.contents.should eq("aZ\n")
   end
 
+  it "counts update columns as UTF-16 code units after an astral character" do
+    document = doc("a😀b\n")
+
+    document.update_contents([
+      {"!", LSP::Range.new(
+        start: LSP::Position.new(line: 0, character: 3),
+        end: LSP::Position.new(line: 0, character: 4),
+      )},
+    ], version: 1)
+
+    document.contents.should eq("a😀!\n")
+  end
+
+  it "counts update columns as UTF-16 code units when replacing an astral character" do
+    document = doc("a😀b\n")
+
+    document.update_contents([
+      {"?", LSP::Range.new(
+        start: LSP::Position.new(line: 0, character: 1),
+        end: LSP::Position.new(line: 0, character: 3),
+      )},
+    ], version: 1)
+
+    document.contents.should eq("a?b\n")
+  end
+
   it "updates the version on full document updates" do
     document = doc("foo\n")
 
