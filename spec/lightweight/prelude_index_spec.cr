@@ -47,3 +47,49 @@ describe Crystalline::Lightweight::PreludeIndex do
     mutex.not_nil!.parent_types.should contain("Sync::Mutex")
   end
 end
+
+describe "Crystalline::Lightweight::PreludeIndex cache" do
+  it "round trips splat, double splat and block arguments" do
+    index = Crystalline::Lightweight::Index.new
+    type = Crystalline::Lightweight::TypeInfo.new("CacheProbe", Crystalline::Lightweight::TypeKind::Class)
+    type.methods << Crystalline::Lightweight::MethodInfo.new(
+      name: "each_entry",
+      owner: "CacheProbe",
+      args: [
+        Crystalline::Lightweight::ArgInfo.new(name: "name", restriction: "String"),
+        Crystalline::Lightweight::ArgInfo.new(name: "values", restriction: "Int32", splat: true),
+      ],
+      return_type: "Nil",
+      double_splat: Crystalline::Lightweight::ArgInfo.new(name: "options", restriction: "String"),
+      block_arg: Crystalline::Lightweight::ArgInfo.new(name: "block", restriction: "Int32"),
+    )
+    index.types["CacheProbe"] = type
+    index.top_level_methods << Crystalline::Lightweight::MethodInfo.new(
+      name: "top_level_probe",
+      owner: "::",
+      args: [] of Crystalline::Lightweight::ArgInfo,
+      return_type: nil,
+      double_splat: Crystalline::Lightweight::ArgInfo.new(name: "kwargs", restriction: nil),
+      block_arg: Crystalline::Lightweight::ArgInfo.new(name: "block", restriction: nil),
+    )
+
+    path = File.join(Dir.tempdir, "crystalline-prelude-cache-#{Random::Secure.hex(8)}.bin")
+    begin
+      Crystalline::Lightweight::PreludeIndex.save_to_cache_for_test(index, path)
+      loaded = Crystalline::Lightweight::PreludeIndex.load_from_cache_for_test(path).not_nil!
+
+      method = loaded.types["CacheProbe"].methods.first
+      method.args.map { |arg| {arg.name, arg.splat} }.should eq([{"name", false}, {"values", true}])
+      method.double_splat.not_nil!.name.should eq("options")
+      method.double_splat.not_nil!.restriction.should eq("String")
+      method.block_arg.not_nil!.name.should eq("block")
+
+      top_level = loaded.top_level_methods.first
+      top_level.double_splat.not_nil!.name.should eq("kwargs")
+      top_level.double_splat.not_nil!.restriction.should be_nil
+      top_level.block_arg.not_nil!.name.should eq("block")
+    ensure
+      File.delete(path) if File.exists?(path)
+    end
+  end
+end

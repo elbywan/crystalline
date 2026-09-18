@@ -14,7 +14,11 @@ module Crystalline::Lightweight
     Unknown
   end
 
-  record ArgInfo, name : String, restriction : String?
+  record ArgInfo,
+    name : String,
+    restriction : String?,
+    # True for a splat argument (`*args`).
+    splat : Bool = false
 
   record MethodInfo,
     name : String,
@@ -28,7 +32,10 @@ module Crystalline::Lightweight
     name_location : Crystal::Location? = nil,
     name_size : Int32 = 0,
     free_vars : Array(String) = [] of String,
-    block_restriction : String? = nil
+    block_restriction : String? = nil,
+    # `**args` and `&block` arguments, which `Def#args` does not include.
+    double_splat : ArgInfo? = nil,
+    block_arg : ArgInfo? = nil
 
   class TypeInfo
     getter name : String
@@ -84,6 +91,15 @@ module Crystalline::Lightweight
                 # methods (`group_by` keeps `(T -> U)` but loses
                 # `Hash(U, Array(T))`): the source declaration wins.
                 if existing.methods[existing_index].return_type.nil? && method.return_type
+                  existing.methods[existing_index] = method
+                end
+                # The compiler expands splat arguments when it specializes a
+                # method (`push(*values)` becomes `push(value : Int32)`): the
+                # signature a user wrote is the useful one.
+                existing_method = existing.methods[existing_index]
+                if method.args.any?(&.splat) && existing_method.args.none?(&.splat)
+                  existing.methods[existing_index] = method
+                elsif method.double_splat && existing_method.double_splat.nil?
                   existing.methods[existing_index] = method
                 end
               else
@@ -965,9 +981,17 @@ module Crystalline::Lightweight
     end
 
     protected def method_info_for(definition : Crystal::Def | Crystal::Macro, *, owner : String, class_method = false, is_macro = false)
-      args = definition.args.map do |arg|
-        ArgInfo.new(name: arg.name.to_s, restriction: arg.restriction.try(&.to_s))
+      splat_index = definition.responds_to?(:splat_index) ? definition.splat_index : nil
+      args = definition.args.map_with_index do |arg, index|
+        ArgInfo.new(
+          name: arg.name.to_s,
+          restriction: arg.restriction.try(&.to_s),
+          splat: splat_index == index,
+        )
       end
+
+      double_splat = definition.responds_to?(:double_splat) ? definition.double_splat.try { |arg| arg_info_for(arg) } : nil
+      block_arg = definition.responds_to?(:block_arg) ? definition.block_arg.try { |arg| arg_info_for(arg) } : nil
 
       return_type = definition.responds_to?(:return_type) ? definition.return_type.try(&.to_s) : nil
       if return_type.nil? && definition.is_a?(Crystal::Def)
@@ -994,7 +1018,14 @@ module Crystalline::Lightweight
         name_size: definition.name.to_s.size,
         free_vars: free_vars,
         block_restriction: block_restriction,
+        double_splat: double_splat,
+        block_arg: block_arg,
       )
+    end
+
+    # `**kwargs` / `&block` arguments, which live outside `Def#args`.
+    private def arg_info_for(arg : Crystal::Arg) : ArgInfo
+      ArgInfo.new(name: arg.name.to_s, restriction: arg.restriction.try(&.to_s))
     end
 
     private def ivars_for(type_name : String) : Hash(String, Array(String))

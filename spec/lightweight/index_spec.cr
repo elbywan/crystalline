@@ -412,3 +412,17 @@ describe Crystalline::Lightweight::Index do
     make.not_nil!.return_type.should eq("Foo")
   end
 end
+
+describe "Crystalline::Lightweight::Index merge" do
+  it "keeps the declared signature when a specialization expanded a splat" do
+    # The compiler turns `push(*values)` into `push(value : Int32)` when it
+    # specializes a method: the merged index keeps the declaration.
+    compiled = Crystalline::Lightweight::Index.from_source("class MergeBox; def push(value : Int32); end; end", "compiled.cr").not_nil!
+    declared = Crystalline::Lightweight::Index.from_source("class MergeBox; def push(*values : Int32); end; end", "declared.cr").not_nil!
+
+    merged = Crystalline::Lightweight::Index.merge([compiled, declared])
+    method = merged.types["MergeBox"].methods.find { |candidate| candidate.name == "push" }.not_nil!
+
+    method.args.map(&.splat).should eq([true])
+  end
+end
